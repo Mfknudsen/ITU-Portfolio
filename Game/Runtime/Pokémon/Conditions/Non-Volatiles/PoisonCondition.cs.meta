@@ -1,0 +1,13 @@
+fileFormatVersion: 2
+guid: ccc6905fd56a3ca4788f8f194a682484
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - affectedPokemon: {instanceID: 0}
+  - onEffectChat: {fileID: 11400000, guid: a384d5220b83ab64eb0ad2f6690b9079, type: 2}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

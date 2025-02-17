@@ -1,0 +1,26 @@
+fileFormatVersion: 2
+guid: 33585313ec75e044283b3f38d61050ad
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - faintCondtion: {fileID: 11400000, guid: d801e3dd745c6cf41acbf0755efe1204, type: 2}
+  - switchAction: {fileID: 11400000, guid: b4b2eb28d8602f14f896b1a7f3eda8cc, type: 2}
+  - action: {instanceID: 0}
+  - checking: {instanceID: 0}
+  - display: {instanceID: 0}
+  - turnDisplay: {instanceID: 0}
+  - selectionMenu: {instanceID: 0}
+  - menu: {instanceID: 0}
+  - superEffective: {fileID: 11400000, guid: 4ecc17f04f409a94a8e38aea3cec0e17, type: 2}
+  - notEffective: {fileID: 11400000, guid: 32fa517f4e565db46b03da7b83cf77a2, type: 2}
+  - noEffect: {fileID: 11400000, guid: c0538418964661443a694526bb10ee20, type: 2}
+  - barelyEffective: {fileID: 11400000, guid: f4ddf49c1e83f024da0072dd82d030a9, type: 2}
+  - extremlyEffective: {fileID: 11400000, guid: 8e47ff91c5b937140bf0985bd47f1c16,
+      type: 2}
+  - SwitchChat: {fileID: 11400000, guid: 76a09965ebd8aad44af51a50197b127a, type: 2}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 7f0bfe0c054d23042974ca56dbe7053e
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - invisiblyUI: {instanceID: 0}
+  - preRenderTexture: {fileID: 8400000, guid: 711d31f423e5d7d4ebebe9bf2132552d, type: 2}
+  - curRenderTexture: {fileID: 8400000, guid: a0fe318b4eb80df43b38de5b3d0a488b, type: 2}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

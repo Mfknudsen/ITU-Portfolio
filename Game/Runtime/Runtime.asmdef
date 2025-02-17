@@ -1,0 +1,33 @@
+{
+    "name": "Runtime",
+    "rootNamespace": "",
+    "references": [
+        "ParadoxNotion",
+        "Unity.TextMeshPro",
+        "Unity.InputSystem",
+        "Unity.Timeline",
+        "Unity.AI.Navigation",
+        "Unity.Burst",
+        "Unity.Collections",
+        "Unity.Mathematics",
+        "Unity.Jobs",
+        "UniTask",
+        "NodeCanvas",
+        "Unity.Entities",
+        "Unity.Entities.Graphics",
+        "Unity.Entities.UI",
+        "Unity.Entities.Hybrid",
+        "Unity.Scenes",
+        "Unity.Transforms",
+        "Unity.Cinemachine"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

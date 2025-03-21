@@ -9,6 +9,10 @@ namespace Runtime.AI.EntityComponents
         public bool Stop;
         public float3 Point;
         public int TriangleID;
-        public float2 IntendedDirection;
+
+        public int TrianglePathCount, FunnelPathCount;
+
+        public int CurrentPathIndex;
+        public float3 MoveDirection;
     }
 }

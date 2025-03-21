@@ -132,6 +132,7 @@ namespace Runtime.Core
             return w1 >= 0 && w2 >= 0 && w1 + w2 <= 1;
         }
 
+        //https://www.youtube.com/watch?v=HYAgJN3x4GA
         public static bool PointWithinTriangle2D(float2 point, float2 a, float2 b, float2 c)
         {
             float s1 = c.y - a.y + 0.0001f;
@@ -235,10 +236,10 @@ namespace Runtime.Core
             return r > 0;
         }
 
-        public static bool IsPointLeftToVector(float2 lineA, float2 lineB, float2 point)
+        public static bool IsPointLeftToVector(float3 lineA, float3 lineB, float3 point)
         {
-            return (lineB.x - lineA.x) * (point.y - lineA.y) -
-                (lineB.y - lineA.y) * (point.x - lineA.x) > 0;
+            return (lineB.x - lineA.x) * (point.z - lineA.z) -
+                (lineB.z - lineA.z) * (point.x - lineA.x) > 0;
         }
 
         public static float QuickCircleIntersectCircleArea(Vector3 center1, Vector3 center2, float radius1,

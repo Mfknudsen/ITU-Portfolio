@@ -14,14 +14,13 @@ using Sirenix.OdinInspector;
 using Sirenix.Utilities;
 using Unity.AI.Navigation;
 using UnityEngine;
-using UnityEngine.Serialization;
 
 #endregion
 
 namespace Runtime.World.Overworld
 {
     public sealed class TileSubController : MonoBehaviour
-    { 
+    {
         #region Values
 
         [SerializeField] [Required] private TileManager tileManager;
@@ -36,7 +35,7 @@ namespace Runtime.World.Overworld
 
         [SerializeField] private PoolSnapshotItem[] poolingSnapshot;
 
-        [FormerlySerializedAs("calculatedNavMesh")] [SerializeField] [FoldoutGroup("Navigation")]
+        [SerializeField] [FoldoutGroup("Navigation")]
         private NavigationMesh navigationMesh;
 
         [SerializeField] [FoldoutGroup("Hierarchy", 1)] [Required]
@@ -60,9 +59,11 @@ namespace Runtime.World.Overworld
         #endregion
 
         #region Build In States
-        
-        private void OnValidate() =>
+
+        private void OnValidate()
+        {
             this.name = this.gameObject.scene.name + " - TileSubController";
+        }
 
         private void Start()
         {
@@ -92,21 +93,45 @@ namespace Runtime.World.Overworld
 
         #region Getters
 
-        public IEnumerable<Neighbor> GetNeighbors() => this.neighbors;
+        public IEnumerable<Neighbor> GetNeighbors()
+        {
+            return this.neighbors;
+        }
 
-        public string GetTileName() => this.name;
+        public string GetTileName()
+        {
+            return this.name;
+        }
 
-        public NavMeshSurface GetSurface() => this.navMeshSurface;
+        public NavMeshSurface GetSurface()
+        {
+            return this.navMeshSurface;
+        }
 
-        public TileEnvironment GetTileEnvironment() => this.tileEnvironment;
+        public TileEnvironment GetTileEnvironment()
+        {
+            return this.tileEnvironment;
+        }
 
-        public TileSpawners GetTileSpawners() => this.tileSpawners;
+        public TileSpawners GetTileSpawners()
+        {
+            return this.tileSpawners;
+        }
 
-        public TileAI GetTileAI() => this.tileAI;
+        public TileAI GetTileAI()
+        {
+            return this.tileAI;
+        }
 
-        public TileLighting GetTileLighting() => this.tileLighting;
+        public TileLighting GetTileLighting()
+        {
+            return this.tileLighting;
+        }
 
-        public TileConnectionPoints GetTileConnectionPoints() => this.tileConnectionPoints;
+        public TileConnectionPoints GetTileConnectionPoints()
+        {
+            return this.tileConnectionPoints;
+        }
 
 #if UNITY_EDITOR
         public NavigationMesh GetNavmesh => this.navigationMesh;
@@ -119,11 +144,20 @@ namespace Runtime.World.Overworld
         #region Setters
 
 #if UNITY_EDITOR
-        public void SetCalculatedNavMesh(NavigationMesh set) => this.navigationMesh = set;
+        public void SetCalculatedNavMesh(NavigationMesh set)
+        {
+            this.navigationMesh = set;
+        }
 
-        public void SetCleanUpPoint(Vector3 set) => this.navmeshCleanUpPoint = set;
+        public void SetCleanUpPoint(Vector3 set)
+        {
+            this.navmeshCleanUpPoint = set;
+        }
 
-        public void SetOptimizedInformation(TileOptimizedInformation set) => this.optimizedInformation = set;
+        public void SetOptimizedInformation(TileOptimizedInformation set)
+        {
+            this.optimizedInformation = set;
+        }
 #endif
 
         #endregion
@@ -303,6 +337,9 @@ namespace Runtime.World.Overworld
     {
         [SerializeField] private SceneReference scene;
 
-        public string GetSceneName() => this.scene.ScenePath;
+        public string GetSceneName()
+        {
+            return this.scene.ScenePath;
+        }
     }
 }

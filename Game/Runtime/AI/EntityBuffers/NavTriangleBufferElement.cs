@@ -13,33 +13,37 @@ namespace Runtime.AI.EntityBuffers
 
         public int A, B, C;
 
+        public int NavGroup;
+
         public float2 Ab, Ac, BC;
+
+        public int NeighborOneA, NeighborOneB, NeighborTwoA, NeighborTwoB, NeighborThreeA, NeighborThreeB;
 
         public float3 Center;
 
         public float MaxY, SquaredRadius;
 
-        [MarshalAs(UnmanagedType.U1)]
-        public bool AbEdge, BcEdge, AcEdge;
-        [MarshalAs(UnmanagedType.U1)]
-        public bool CellNeedsUpdate;
+        [MarshalAs(UnmanagedType.U1)] public bool AbEdge, BcEdge, AcEdge;
+        [MarshalAs(UnmanagedType.U1)] public bool WasUpdated;
 
-        public float NeighborOneWidth, NeighborTwoWidth, NeighborThreeWidth;
+        public float NeighborOneWidth2D, NeighborTwoWidth2D, NeighborThreeWidth2D;
 
-        public int NeighborOne, NeighborTwo, NeighborThree;
+        public int NeighborOneId, NeighborTwoId, NeighborThreeId;
 
         public float2 minBound, maxBound;
 
-        public NavTriangleBufferElement(int id, int a, int b, int c, float2 ab, float2 ac, float2 bc, float maxY,
-            float neighborOneWidth, float neighborTwoWidth, float neighborThreeWidth, bool abEdge,
-            bool bcEdge, bool acEdge, DynamicBuffer<VertXZBufferElement> simpleVerts,
-            DynamicBuffer<VertYBufferElement> vertsY, int neighborOne = -1,
-            int neighborTwo = -1, int neighborThree = -1)
+        public NavTriangleBufferElement(int id, int a, int b, int c, int navGroup, float2 ab, float2 ac, float2 bc,
+            float maxY,
+            float neighborOneWidth2D, float neighborTwoWidth2D, float neighborThreeWidth2D, bool abEdge,
+            bool bcEdge, bool acEdge, DynamicBuffer<VertBufferElement> verts, int neighborOneId, int neighborTwoId,
+            int neighborThreeId,
+            int[] neighborOneShared, int[] neighborTwoShared, int[] neighborThreeShared)
         {
             this.ID = id;
             this.A = a;
             this.B = b;
             this.C = c;
+            this.NavGroup = navGroup;
             this.Ab = ab;
             this.Ac = ac;
             this.BC = bc;
@@ -47,38 +51,43 @@ namespace Runtime.AI.EntityBuffers
             this.AbEdge = abEdge;
             this.BcEdge = bcEdge;
             this.AcEdge = acEdge;
-            this.NeighborOneWidth = neighborOneWidth;
-            this.NeighborTwoWidth = neighborTwoWidth;
-            this.NeighborThreeWidth = neighborThreeWidth;
-            this.NeighborOne = neighborOne;
-            this.NeighborTwo = neighborTwo;
-            this.NeighborThree = neighborThree;
-            this.CellNeedsUpdate = true;
-            this.Center = (simpleVerts[a].ToV3(vertsY[a]) + simpleVerts[b].ToV3(vertsY[b]) +
-                           simpleVerts[c].ToV3(vertsY[c])) / 3f;
+            this.NeighborOneWidth2D = neighborOneWidth2D;
+            this.NeighborTwoWidth2D = neighborTwoWidth2D;
+            this.NeighborThreeWidth2D = neighborThreeWidth2D;
+            this.NeighborOneId = neighborOneId;
+            this.NeighborTwoId = neighborTwoId;
+            this.NeighborThreeId = neighborThreeId;
+            this.WasUpdated = true;
+
+            this.NeighborOneA = neighborOneShared[0];
+            this.NeighborOneB = neighborOneShared[1];
+            this.NeighborTwoA = neighborTwoShared[0];
+            this.NeighborTwoB = neighborTwoShared[1];
+            this.NeighborThreeA = neighborThreeShared[0];
+            this.NeighborThreeB = neighborThreeShared[1];
+
+            this.Center = (verts[a].Position + verts[b].Position +
+                           verts[c].Position) / 3f;
             this.SquaredRadius =
                 Mathf.Max(
-                    this.Center.QuickSquareDistance(simpleVerts[a].ToV3(vertsY[a])),
+                    this.Center.QuickSquareDistance(verts[a].Position),
                     Mathf.Max(
-                        this.Center.QuickSquareDistance(simpleVerts[b].ToV3(vertsY[b])),
-                        this.Center.QuickSquareDistance(simpleVerts[c].ToV3(vertsY[c]))));
+                        this.Center.QuickSquareDistance(verts[b].Position)),
+                    this.Center.QuickSquareDistance(verts[c].Position));
 
             this.minBound = new float2(
-                Mathf.Min(simpleVerts[a].X, Mathf.Min(simpleVerts[b].X, simpleVerts[c].X),
-                    Mathf.Min(simpleVerts[a].Z, Mathf.Min(simpleVerts[b].Z, simpleVerts[c].Z))));
+                Mathf.Min(verts[a].Position.x, Mathf.Min(verts[b].Position.x, verts[c].Position.x),
+                    Mathf.Min(verts[a].Position.z, Mathf.Min(verts[b].Position.z, verts[c].Position.z))));
             this.maxBound = new float2(
-                Mathf.Max(simpleVerts[a].X, Mathf.Max(simpleVerts[b].X, simpleVerts[c].X),
-                    Mathf.Max(simpleVerts[a].Z, Mathf.Max(simpleVerts[b].Z, simpleVerts[c].Z))));
+                Mathf.Max(verts[a].Position.x, Mathf.Max(verts[b].Position.x, verts[c].Position.x),
+                    Mathf.Max(verts[a].Position.z, Mathf.Max(verts[b].Position.z, verts[c].Position.z))));
         }
 
-        public readonly NativeArray<int> Vertices()
+        public readonly void Vertices(ref NativeArray<int> reuseArray)
         {
-            return new NativeArray<int>(3, Allocator.Temp)
-            {
-                [0] = this.A,
-                [1] = this.B,
-                [2] = this.C
-            };
+            reuseArray[0] = this.A;
+            reuseArray[1] = this.B;
+            reuseArray[2] = this.C;
         }
     }
 }

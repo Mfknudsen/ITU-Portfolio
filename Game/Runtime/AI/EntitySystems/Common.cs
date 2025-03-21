@@ -8,19 +8,22 @@ namespace Runtime.AI.EntitySystems
 {
     internal static class Common
     {
-        public static NativeList<int> GetTriangleIdsByPositionSpiralOutwards(float3 position, int min, int max,
+        public static int GetTriangleIdsByPositionSpiralOutwards(
+            ref NativeList<TriangleFlattenIndexBufferElement> reuseList,
+            float3 position, int min, int max,
             int increaseForSpiral, int cellXLength, int cellZLength, float minFloorX, float minFloorZ,
             float groupDivision,
             NativeArray<TriangleFlattenIndexBufferElement> triangleIndexes,
-            NativeArray<TriangleFlattenStartIndexBufferElement> triangleStartIndexArray,
-            NativeArray<TriangleFlattenSizeBufferElement> triangleArraySizes)
+            NativeArray<TriangleFlattenBufferElement> triangleArraySizes)
         {
             if (max <= min) throw new Exception("Max must be greater then min");
 
             if (increaseForSpiral < 0) throw new Exception("Increase must be zero or greater");
 
-            NativeList<int> result = new NativeList<int>(Allocator.Temp);
-            while (result.Length == 0 &&
+            int reuseSize = 0;
+
+            NativeHashSet<int> addedIds = new NativeHashSet<int>(64, Allocator.Temp);
+            while (reuseList.Length == 0 &&
                    (max - (max - min) < cellXLength ||
                     max - (max - min) < cellZLength))
             {
@@ -36,10 +39,21 @@ namespace Runtime.AI.EntitySystems
                     {
                         if (id.y + y < 0 || id.y + y >= cellZLength) continue;
 
-                        foreach (int i in GetTriangleIndexByXZ(id.x + x, id.y + y, cellXLength, triangleIndexes,
-                                     triangleStartIndexArray, triangleArraySizes))
-                            if (!result.Contains(i))
-                                result.Add(i);
+                        reuseSize = GetTriangleIndexByXZ(
+                            ref reuseList,
+                            id.x + x, id.y + y,
+                            cellXLength, triangleIndexes,
+                            triangleArraySizes);
+
+                        for (int i = 0; i < reuseSize; i++)
+                        {
+                            TriangleFlattenIndexBufferElement t = reuseList[i];
+                            if (addedIds.Contains(t.Index)) continue;
+
+                            addedIds.Add(t.Index);
+                            reuseList.Add(t);
+                            reuseSize++;
+                        }
                     }
                 }
 
@@ -50,31 +64,35 @@ namespace Runtime.AI.EntitySystems
                 max += increaseForSpiral;
             }
 
-            return result;
+
+            return reuseSize;
         }
 
-        public static NativeArray<int> GetTriangleIdsByPosition(float3 pos, int cellXLength, int cellZLength,
+        public static int GetTriangleIdsByPosition(
+            ref NativeList<TriangleFlattenIndexBufferElement> reuseArray,
+            float3 pos,
+            int cellXLength, int cellZLength,
             float minFloorX, float minFloorZ, float groupDivision,
             NativeArray<TriangleFlattenIndexBufferElement> triangleIndexes,
-            NativeArray<TriangleFlattenStartIndexBufferElement> triangleStartIndexArray,
-            NativeArray<TriangleFlattenSizeBufferElement> triangleArraySizes)
+            NativeArray<TriangleFlattenBufferElement> triangleArraySizes)
         {
             int2 id = GroupingIDByPosition(pos, minFloorX, minFloorZ, cellXLength, cellZLength, groupDivision);
 
-            return GetTriangleIndexByXZ(id.x, id.y, cellXLength, triangleIndexes,
-                triangleStartIndexArray, triangleArraySizes);
+            return GetTriangleIndexByXZ(ref reuseArray, id.x, id.y, cellXLength, triangleIndexes,
+                triangleArraySizes);
         }
 
-        public static NativeArray<int> GetTriangleIdsByPosition(float x, float z, int cellXLength, int cellZLength,
+        public static int GetTriangleIdsByPosition(
+            ref NativeList<TriangleFlattenIndexBufferElement> reuseArray,
+            float x, float z,
+            int cellXLength, int cellZLength,
             float minFloorX, float minFloorZ, float groupDivision,
             NativeArray<TriangleFlattenIndexBufferElement> triangleIndexes,
-            NativeArray<TriangleFlattenStartIndexBufferElement> triangleStartIndexArray,
-            NativeArray<TriangleFlattenSizeBufferElement> triangleArraySizes)
+            NativeArray<TriangleFlattenBufferElement> triangleArraySizes)
         {
             int2 id = GroupingIDByPosition(x, z, minFloorX, minFloorZ, cellXLength, cellZLength, groupDivision);
 
-            return GetTriangleIndexByXZ(id.x, id.y, cellXLength, triangleIndexes,
-                triangleStartIndexArray, triangleArraySizes);
+            return GetTriangleIndexByXZ(ref reuseArray, id.x, id.y, cellXLength, triangleIndexes, triangleArraySizes);
         }
 
         private static int2 GroupingIDByPosition(float3 position, float minFloorX, float minFloorZ, int cellXLength,
@@ -105,26 +123,26 @@ namespace Runtime.AI.EntitySystems
                     cellZLength - 1)));
         }
 
-        private static NativeArray<int> GetTriangleIndexByXZ(int x, int z, int cellXLength,
+        private static int GetTriangleIndexByXZ(
+            ref NativeList<TriangleFlattenIndexBufferElement> reuseArray,
+            int x, int z,
+            int cellXLength,
             NativeArray<TriangleFlattenIndexBufferElement> triangleIndexes,
-            NativeArray<TriangleFlattenStartIndexBufferElement> triangleStartIndexArray,
-            NativeArray<TriangleFlattenSizeBufferElement> triangleArraySizes)
+            NativeArray<TriangleFlattenBufferElement> triangleArraySizes)
         {
             int arrayPosition2D = x * cellXLength + z;
             int size = triangleArraySizes[arrayPosition2D].Size;
-            int startPositionInArray3D = triangleStartIndexArray[arrayPosition2D].Index;
+            int startPositionInArray3D = triangleArraySizes[arrayPosition2D].StartIndex;
 
-            NativeArray<int> result = new NativeArray<int>(size, Allocator.Temp);
             for (int i = 0; i < size; i++)
-                result[i] = triangleIndexes[startPositionInArray3D + i].Index;
+            {
+                if (i < reuseArray.Length)
+                    reuseArray[i] = triangleIndexes[startPositionInArray3D + i];
+                else
+                    reuseArray.Add(triangleIndexes[startPositionInArray3D + i]);
+            }
 
-            return result;
-        }
-
-        public static float3 VertByIndex(int index, NativeArray<VertXZBufferElement> simpleVerts,
-            NativeArray<VertYBufferElement> vertsY)
-        {
-            return new float3(simpleVerts[index].X, vertsY[index].Y, simpleVerts[index].Z);
+            return size;
         }
     }
 }

@@ -87,6 +87,11 @@ namespace Runtime.Core
             return new float3(v.x, y, v.y);
         }
 
+        public static Vector3 ToV3(this float2 v, float y)
+        {
+            return new Vector3(v.x, y, v.y);
+        }
+
         #endregion
 
         #region float3
@@ -111,6 +116,11 @@ namespace Runtime.Core
         {
             float3 v = a - b;
             return v.x * v.x + v.y * v.y + v.z * v.z;
+        }
+
+        public static float QuickSquareDistance(this float3 a)
+        {
+            return a.x * a.x + a.y * a.y + a.z * a.z;
         }
 
         #endregion

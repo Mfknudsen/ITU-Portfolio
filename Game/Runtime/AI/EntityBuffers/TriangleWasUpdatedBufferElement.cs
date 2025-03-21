@@ -2,11 +2,11 @@ using Unity.Entities;
 
 namespace Runtime.AI.EntityBuffers
 {
-    public struct AgentTrianglePathBufferElement : IBufferElementData
+    public struct TriangleWasUpdatedBufferElement : IBufferElementData
     {
         public int Index;
 
-        public AgentTrianglePathBufferElement(int index)
+        public TriangleWasUpdatedBufferElement(int index)
         {
             this.Index = index;
         }

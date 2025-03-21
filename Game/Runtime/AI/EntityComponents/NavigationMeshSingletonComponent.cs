@@ -8,8 +8,6 @@ namespace Runtime.AI.EntityComponents
 {
     public struct NavigationMeshSingletonComponent : IComponentData
     {
-        #region Values
-
         public float MinFloorX,
             MinFloorZ,
             MaxFloorX,
@@ -19,6 +17,6 @@ namespace Runtime.AI.EntityComponents
 
         public int CellXLength, CellZLength;
 
-        #endregion
+        public int VertsWasUpdatedSize, TrianglesWasUpdatedSize;
     }
 }

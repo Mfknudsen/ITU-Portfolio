@@ -15,8 +15,7 @@ namespace Runtime.AI
         [BurstCompile]
         public static void GetPath(in float3 start, in float3 end, in NativeArray<int> triangleIDs,
             in NativeArray<NavTriangleBufferElement> triangles,
-            in NativeArray<VertXZBufferElement> simpleVerts,
-            in NativeArray<VertYBufferElement> vertsY,
+            in NativeArray<VertBufferElement> verts,
             ref DynamicBuffer<WayPointBufferElement> agentPath,
             in AgentSettingsComponent agentSettings)
         {
@@ -28,7 +27,7 @@ namespace Runtime.AI
                 //List of portals to check.
                 GetPortals(apex,
                     triangleIDs,
-                    triangles, simpleVerts, vertsY,
+                    triangles, verts,
                     agentSettings.Radius,
                     out NativeArray<float2> remappedSimpleVerts,
                     out NativeArray<float3> remappedVerts,
@@ -175,19 +174,18 @@ namespace Runtime.AI
 
         [BurstCompile]
         private static void GetPortals(in float2 start, in NativeArray<int> triangleIDs,
-            in NativeArray<NavTriangleBufferElement> triangles, in NativeArray<VertXZBufferElement> simpleVerts,
-            in NativeArray<VertYBufferElement> vertsY,
+            in NativeArray<NavTriangleBufferElement> triangles, in NativeArray<VertBufferElement> verts,
             float agentRadius,
             out NativeArray<float2> remappedSimpleVerts, out NativeArray<float3> remappedVerts,
             out NativeArray<int> rightArray, out NativeArray<int> leftArray)
         {
             //RemappingVertices
-            NativeList<float3> remappedVertsResult = new NativeList<float3>(vertsY.Length, Allocator.Temp);
-            NativeList<float2> remappedSimpleVertsResult = new NativeList<float2>(vertsY.Length, Allocator.Temp);
+            NativeList<float3> remappedVertsResult = new NativeList<float3>(verts.Length, Allocator.Temp);
+            NativeList<float2> remappedSimpleVertsResult = new NativeList<float2>(verts.Length, Allocator.Temp);
             NativeList<int> shared = new NativeList<int>(2, Allocator.Temp);
 
-            NativeList<int> rightArrayResult = new NativeList<int>(vertsY.Length / 2, Allocator.Temp),
-                leftArrayResult = new NativeList<int>(vertsY.Length / 2, Allocator.Temp);
+            NativeList<int> rightArrayResult = new NativeList<int>(verts.Length / 2, Allocator.Temp),
+                leftArrayResult = new NativeList<int>(verts.Length / 2, Allocator.Temp);
 
             NativeList<int> oldIndex = new NativeList<int>(triangleIDs.Length / 3, Allocator.Temp);
             NativeList<float3> directions = new NativeList<float3>(oldIndex.Length, Allocator.Temp);
@@ -196,8 +194,7 @@ namespace Runtime.AI
             {
                 Shared(triangles[triangleIDs[i]], triangles[triangleIDs[i - 1]], ref shared);
 
-                float3 ab = simpleVerts[shared[0]].ToV3(vertsY[shared[0]]) -
-                            simpleVerts[shared[1]].ToV3(vertsY[shared[1]]);
+                float3 ab = verts[shared[0]].Position - verts[shared[1]].Position;
 
                 int index = Contains(oldIndex, shared[0]);
                 if (index == -1)
@@ -249,7 +246,7 @@ namespace Runtime.AI
 
             for (int i = 0; i < oldIndex.Length; i++)
             {
-                float3 vert = simpleVerts[oldIndex[i]].ToV3(vertsY[oldIndex[i]]) +
+                float3 vert = verts[oldIndex[i]].Position +
                               directions[i].Normalize() * agentRadius * 1.25f;
                 remappedVertsResult.Add(vert);
                 remappedSimpleVertsResult.Add(vert.XZ());

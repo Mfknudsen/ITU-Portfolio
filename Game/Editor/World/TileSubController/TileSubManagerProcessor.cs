@@ -51,7 +51,7 @@ namespace Editor.World.TileSubController
                 new FoldoutGroupAttribute("Lightning"));
 
             propertyInfos.AddDelegate("Optimize Tile",
-                () => OptimizeTile(this.ValueEntry.Values[0]),
+                () => this.OptimizeTile(this.ValueEntry.Values[0]),
                 new FoldoutGroupAttribute("Optimize"), new PropertyOrderAttribute(-2));
         }
 
@@ -61,7 +61,7 @@ namespace Editor.World.TileSubController
 
         #region Optimizations
 
-        private static async void OptimizeTile(TileController tileSubController)
+        private async void OptimizeTile(TileController tileSubController)
         {
             if (BakedEditorManager.IsBakeRunning || tileSubController == null)
                 return;

@@ -10,6 +10,8 @@ using Runtime.Core;
 using Runtime.Editor.Tests;
 using Sirenix.OdinInspector;
 using Unity.Entities;
+using Unity.Mathematics;
+using Unity.Transforms;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Events;
@@ -24,7 +26,7 @@ namespace Runtime.AI.Navigation
     {
         #region Values
 
-        private Entity entity;
+        private Entity? entity;
 
         [ShowInInspector] private int agentID = -1, groupID = -1;
 
@@ -84,6 +86,17 @@ namespace Runtime.AI.Navigation
             capsuleCollider.height = 2;
         }
 
+        private void OnEnable()
+        {
+            this.entity = UnitNavigation.AddAgent(this);
+        }
+
+        private void OnDisable()
+        {
+            UnitNavigation.RemoveAgent(this, this.entity);
+            this.entity = null;
+        }
+
         private IEnumerator Start()
         {
             this.onPathComplete = new UnityEvent();
@@ -98,14 +111,27 @@ namespace Runtime.AI.Navigation
                 this.rb.useGravity = true;
         }
 
-        private void OnEnable()
+        private void Update()
         {
-            UnitNavigation.AddAgent(this);
+            if (!this.entity.HasValue) return;
+
+            DestinationComponent destinationComponent = Unity.Entities.World.DefaultGameObjectInjectionWorld
+                .EntityManager.GetComponentData<DestinationComponent>(this.entity.Value);
+
+            this.transform.position +=
+                (Vector3)destinationComponent.MoveDirection * (this.settings.MoveSpeed * Time.deltaTime);
         }
 
-        private void OnDisable()
+        private void LateUpdate()
         {
-            UnitNavigation.RemoveAgent(this);
+            if (!this.entity.HasValue) return;
+
+            EntityManager entityManager = Unity.Entities.World.DefaultGameObjectInjectionWorld
+                .EntityManager;
+            LocalTransform localTransformComponent = entityManager.GetComponentData<LocalTransform>(this.entity.Value);
+            localTransformComponent.Position = this.transform.position;
+            localTransformComponent.Rotation = this.transform.rotation;
+            entityManager.SetComponentData(this.entity.Value, localTransformComponent);
         }
 
         #endregion
@@ -151,7 +177,8 @@ namespace Runtime.AI.Navigation
 
         public bool HasEntity()
         {
-            return Unity.Entities.World.DefaultGameObjectInjectionWorld.EntityManager.Exists(this.entity);
+            return this.entity != null &&
+                   Unity.Entities.World.DefaultGameObjectInjectionWorld.EntityManager.Exists(this.entity.Value);
         }
 
 #if UNITY_EDITOR
@@ -178,11 +205,6 @@ namespace Runtime.AI.Navigation
         internal void SetGroupID(int set)
         {
             this.groupID = set;
-        }
-
-        internal void SetEntity(Entity set)
-        {
-            this.entity = set;
         }
 
         #endregion
@@ -240,12 +262,21 @@ namespace Runtime.AI.Navigation
 
         public void MoveTo(Vector3 position)
         {
+            if (this.entity == null) return;
+
             EntityManager entityManager = Unity.Entities.World.DefaultGameObjectInjectionWorld.EntityManager;
-            DestinationComponent component = entityManager.GetComponentData<DestinationComponent>(this.entity);
-            component.Point = position;
-            component.Stop = false;
-            entityManager.SetComponentData(this.entity, component);
-            entityManager.SetComponentEnabled<DestinationComponent>(this.entity, true);
+            if (entityManager.HasComponent<DestinationComponent>(this.entity.Value))
+            {
+                DestinationComponent component =
+                    entityManager.GetComponentData<DestinationComponent>(this.entity.Value);
+
+                component.Point = position;
+                component.Stop = false;
+                component.MoveDirection = float3.zero;
+                component.CurrentPathIndex = 0;
+                entityManager.SetComponentData(this.entity.Value, component);
+                entityManager.SetComponentEnabled<DestinationComponent>(this.entity.Value, true);
+            }
 
             return;
             if (this.PositionInCurrentTriangle(position))

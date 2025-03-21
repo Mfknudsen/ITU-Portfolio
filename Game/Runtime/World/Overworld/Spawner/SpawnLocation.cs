@@ -1,11 +1,12 @@
 #region Libraries
 
-using Runtime.Pokémon;
-using Sirenix.OdinInspector;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Runtime.Pokémon;
+using Sirenix.OdinInspector;
 using UnityEngine;
+using Random = UnityEngine.Random;
 
 #endregion
 
@@ -15,17 +16,16 @@ namespace Runtime.World.Overworld.Spawner
     {
         #region Values
 
-        [SerializeReference, HideReferenceObjectPicker]
+        [SerializeField] [HideReferenceObjectPicker]
         private ISpawnType spawnType = new Area();
 
-        [SerializeField] private Pokemon[] allowedToSpawn = new Pokemon[0];
+        [SerializeField] private Pokemon[] allowedToSpawn = Array.Empty<Pokemon>();
 
 #if UNITY_EDITOR
-        [ValueDropdown("valueOptions")]
-        public string selectedDropdownOption = "Area";
+        [ValueDropdown("ValueOptions")] public string selectedDropdownOption = "Area";
 
 #pragma warning disable IDE0052 // Remove unread private members
-        private static readonly string[] valueOptions = { "Area", "Points" };
+        private static readonly string[] ValueOptions = { "Area", "Points" };
 #pragma warning restore IDE0052 // Remove unread private members
 #endif
 
@@ -71,7 +71,10 @@ namespace Runtime.World.Overworld.Spawner
         #region Setters
 
 #if UNITY_EDITOR
-        public void SetAreaPointPosition(int i, Vector3 pos) => ((Area)this.spawnType).SetPointByID(i, pos);
+        public void SetAreaPointPosition(int i, Vector3 pos)
+        {
+            ((Area)this.spawnType).SetPointByID(i, pos);
+        }
 #endif
 
         #endregion
@@ -80,22 +83,41 @@ namespace Runtime.World.Overworld.Spawner
 
 #if UNITY_EDITOR
 
-        public void CreateAreaPoint() => ((Area)this.spawnType).AddPoint(this.transform.position);
+        public void CreateAreaPoint()
+        {
+            ((Area)this.spawnType).AddPoint(this.transform.position);
+        }
 
-        public bool TryRemoveAreaPoint(int id) => ((Area)this.spawnType).TryRemovePoint(id);
+        public bool TryRemoveAreaPoint(int id)
+        {
+            return ((Area)this.spawnType).TryRemovePoint(id);
+        }
 
-        public bool TryCreateNewAreaTriangle(int[] ids) => ((Area)this.spawnType).TryCreateNewTriangle(ids);
+        public bool TryCreateNewAreaTriangle(int[] ids)
+        {
+            return ((Area)this.spawnType).TryCreateNewTriangle(ids);
+        }
 
-        public bool TryRemoveAreaTriangle(int[] ids) => ((Area)this.spawnType).TryRemoveTriangle(ids);
+        public bool TryRemoveAreaTriangle(int[] ids)
+        {
+            return ((Area)this.spawnType).TryRemoveTriangle(ids);
+        }
 
-        public bool TryCleanAreaPoints() => ((Area)this.spawnType).TryCleanPoints();
+        public bool TryCleanAreaPoints()
+        {
+            return ((Area)this.spawnType).TryCleanPoints();
+        }
 
 #endif
+
         #endregion
 
         #region Out
 
-        public bool Allowed(Pokemon pokemon) => this.allowedToSpawn.Count() == 0 || this.allowedToSpawn.Contains(pokemon);
+        public bool Allowed(Pokemon pokemon)
+        {
+            return this.allowedToSpawn.Count() == 0 || this.allowedToSpawn.Contains(pokemon);
+        }
 
         public SpawnTypeResult GetSpawnResult => this.spawnType.GetResult();
 
@@ -119,7 +141,6 @@ namespace Runtime.World.Overworld.Spawner
 #endif
 
         public SpawnTypeResult GetResult();
-
     }
 
     [Serializable]
@@ -133,12 +154,12 @@ namespace Runtime.World.Overworld.Spawner
 
         public SpawnTypeResult GetResult()
         {
-            Transform t = this.locations[UnityEngine.Random.Range(0, this.locations.Length)];
+            Transform t = this.locations[Random.Range(0, this.locations.Length)];
 
             return new SpawnTypeResult
             {
                 Position = t.position,
-                Rotation = t.rotation,
+                Rotation = t.rotation
             };
         }
 
@@ -157,8 +178,10 @@ namespace Runtime.World.Overworld.Spawner
         {
         }
 
-        public void Validate(SpawnLocation self) =>
+        public void Validate(SpawnLocation self)
+        {
             this.locations ??= new Transform[0];
+        }
 #endif
 
         #endregion
@@ -168,6 +191,7 @@ namespace Runtime.World.Overworld.Spawner
     internal struct Area : ISpawnType
     {
         #region Values
+
 #if UNITY_EDITOR
         [SerializeField] private List<Vector3> storedPoints;
         [SerializeField] private List<Vector3Int> storedTriangles;
@@ -184,10 +208,14 @@ namespace Runtime.World.Overworld.Spawner
         #endregion
 
         #region Setters
+
 #if UNITY_EDITOR
-        public void SetPointByID(int i, Vector3 position) =>
+        public void SetPointByID(int i, Vector3 position)
+        {
             this.storedPoints[i] = position;
+        }
 #endif
+
         #endregion
 
         #region In
@@ -315,17 +343,18 @@ namespace Runtime.World.Overworld.Spawner
             return changeHappend;
         }
 #endif
+
         #endregion
 
         #region Out
 
         public SpawnTypeResult GetResult()
         {
-            Vector3Int ids = this.storedTriangles[UnityEngine.Random.Range(0, this.storedTriangles.Count)];
+            Vector3Int ids = this.storedTriangles[Random.Range(0, this.storedTriangles.Count)];
             Vector3 dirA = this.storedPoints[ids.y] - this.storedPoints[ids.x],
                 dirB = this.storedPoints[ids.z] - this.storedPoints[ids.x];
 
-            float aRandom = UnityEngine.Random.Range(0f, 1f), bRandom = UnityEngine.Random.Range(0f, 1f);
+            float aRandom = Random.Range(0f, 1f), bRandom = Random.Range(0f, 1f);
 
             if (!(aRandom + bRandom <= 1))
             {
@@ -334,13 +363,13 @@ namespace Runtime.World.Overworld.Spawner
             }
 
             Vector3 newPoint = this.storedPoints[ids.x] +
-                Vector3.Lerp(Vector3.zero, dirA, aRandom) +
-                Vector3.Lerp(Vector3.zero, dirB, bRandom);
+                               Vector3.Lerp(Vector3.zero, dirA, aRandom) +
+                               Vector3.Lerp(Vector3.zero, dirB, bRandom);
 
             return new SpawnTypeResult
             {
                 Position = newPoint,
-                Rotation = Quaternion.Euler(new Vector3(0, UnityEngine.Random.Range(0, 360), 0))
+                Rotation = Quaternion.Euler(new Vector3(0, Random.Range(0, 360), 0))
             };
         }
 
@@ -358,7 +387,7 @@ namespace Runtime.World.Overworld.Spawner
                     v.x > removed ? v.x - 1 : v.x,
                     v.y > removed ? v.y - 1 : v.y,
                     v.z > removed ? v.z - 1 : v.z
-                    );
+                );
 
                 this.storedTriangles[i] = v;
             }

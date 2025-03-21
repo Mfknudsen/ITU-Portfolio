@@ -31,7 +31,7 @@ namespace Runtime.AI.Navigation
 
         private NavigationPoint[] navigationPoints;
 
-        public const float GroupDivision = 20f;
+        public const float GroupDivision = 5f;
 
         [SerializeField] [ReadOnly] private float minFloorX,
             minFloorZ,

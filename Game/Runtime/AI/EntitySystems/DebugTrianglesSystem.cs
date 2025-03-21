@@ -2,11 +2,14 @@ using Runtime.AI.EntityAspects;
 using Runtime.AI.EntityBuffers;
 using Runtime.AI.EntityComponents;
 using Runtime.AI.Navigation;
+using Unity.Burst;
 using Unity.Entities;
 using UnityEngine;
 
 namespace Runtime.AI.EntitySystems
 {
+    [UpdateInGroup(typeof(NavigationSystemGroup))]
+    [BurstCompile]
     public partial struct DebugTrianglesSystem : ISystem
     {
         public void OnCreate(ref SystemState state)
@@ -15,6 +18,7 @@ namespace Runtime.AI.EntitySystems
             state.RequireForUpdate<NavigationMeshSingletonComponent>();
         }
 
+        [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
             Entity singletonEntity = SystemAPI.GetSingletonEntity<NavigationMeshSingletonComponent>();
@@ -26,22 +30,33 @@ namespace Runtime.AI.EntitySystems
             Vector3 xDir = Vector3.right * NavigationMesh.GroupDivision,
                 zDir = Vector3.forward * NavigationMesh.GroupDivision;
 
-            DynamicBuffer<VertXZBufferElement> vertXZBufferElements =
-                SystemAPI.GetBuffer<VertXZBufferElement>(singletonEntity);
-            DynamicBuffer<VertYBufferElement> vertYBufferElements =
-                SystemAPI.GetBuffer<VertYBufferElement>(singletonEntity);
+            DynamicBuffer<VertBufferElement> vertXZBufferElements =
+                SystemAPI.GetBuffer<VertBufferElement>(singletonEntity);
             DynamicBuffer<NavTriangleBufferElement> navTriangleBufferElements =
                 SystemAPI.GetBuffer<NavTriangleBufferElement>(singletonEntity);
 
             foreach (NavTriangleBufferElement triangle in navTriangleBufferElements)
             {
-                Vector3 a = vertXZBufferElements[triangle.A].ToV3(vertYBufferElements[triangle.A]),
-                    b = vertXZBufferElements[triangle.B].ToV3(vertYBufferElements[triangle.B]),
-                    c = vertXZBufferElements[triangle.C].ToV3(vertYBufferElements[triangle.C]);
+                Vector3 a, b;
+                if (triangle.NeighborOneId > triangle.ID)
+                {
+                    a = vertXZBufferElements[triangle.NeighborOneA].Position;
+                    b = vertXZBufferElements[triangle.NeighborOneB].Position;
+                    Debug.DrawLine(a, b);
+                }
 
+                if (triangle.NeighborTwoId > triangle.ID)
+                {
+                    a = vertXZBufferElements[triangle.NeighborTwoA].Position;
+                    b = vertXZBufferElements[triangle.NeighborTwoB].Position;
+                    Debug.DrawLine(a, b);
+                }
+
+                if (triangle.NeighborThreeId <= triangle.ID) continue;
+
+                a = vertXZBufferElements[triangle.NeighborThreeA].Position;
+                b = vertXZBufferElements[triangle.NeighborThreeB].Position;
                 Debug.DrawLine(a, b);
-                Debug.DrawLine(a, c);
-                Debug.DrawLine(c, b);
             }
 
             int i = 0;
@@ -58,12 +73,15 @@ namespace Runtime.AI.EntitySystems
                 Debug.DrawRay(p + xDir + zDir, -xDir);
                 Debug.DrawRay(p + xDir + zDir, -zDir);
 
-                foreach (NavMeshCellTriangleIndexBufferElement triangleIndex in aspect.NavTriangleBufferElements)
+                int size = aspect.CellComponent.ValueRO.Size;
+                DynamicBuffer<NavMeshCellTriangleIndexBufferElement> triangleIds = aspect.NavTriangleBufferElements;
+
+                for (int j = 0; j < size; j++)
                 {
-                    NavTriangleBufferElement triangle = navTriangleBufferElements[triangleIndex.Index];
-                    Vector3 a = vertXZBufferElements[triangle.A].ToV3(vertYBufferElements[triangle.A]),
-                        b = vertXZBufferElements[triangle.B].ToV3(vertYBufferElements[triangle.B]),
-                        c = vertXZBufferElements[triangle.C].ToV3(vertYBufferElements[triangle.C]);
+                    NavTriangleBufferElement triangle = navTriangleBufferElements[triangleIds[j].Index];
+                    Vector3 a = vertXZBufferElements[triangle.A].Position,
+                        b = vertXZBufferElements[triangle.B].Position,
+                        c = vertXZBufferElements[triangle.C].Position;
 
                     a += Vector3.up * i;
                     b += Vector3.up * i;

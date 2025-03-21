@@ -123,25 +123,32 @@ namespace Runtime.AI.Navigation
 
                 component = entityManager.CreateEntityQuery(typeof(NavigationMeshSingletonComponent))
                     .GetSingleton<NavigationMeshSingletonComponent>();
-                entityManager.AddBuffer<VertYBufferElement>(singletonEntity);
-                entityManager.AddBuffer<VertXZBufferElement>(singletonEntity);
+                entityManager.AddBuffer<VertBufferElement>(singletonEntity);
                 entityManager.AddBuffer<NavTriangleBufferElement>(singletonEntity);
                 entityManager.AddBuffer<AreaBufferElement>(singletonEntity);
 
                 entityManager.AddBuffer<TriangleFlattenIndexBufferElement>(singletonEntity);
-                entityManager.AddBuffer<TriangleFlattenSizeBufferElement>(singletonEntity);
-                entityManager.AddBuffer<TriangleFlattenStartIndexBufferElement>(singletonEntity);
+                entityManager.AddBuffer<TriangleFlattenBufferElement>(singletonEntity);
+
+                entityManager.AddBuffer<VertInTrianglesFlattenIndexBufferElement>(singletonEntity);
+                entityManager.AddBuffer<VertInTrianglesFlattenBufferElement>(singletonEntity);
+
+
+                entityManager.AddBuffer<VertWasUpdatedBufferElement>(singletonEntity);
+                entityManager.AddBuffer<TriangleWasUpdatedBufferElement>(singletonEntity);
             }
             else
                 singletonEntity = query.GetSingletonEntity();
 
-            DynamicBuffer<VertYBufferElement> vertsY = entityManager.GetBuffer<VertYBufferElement>(singletonEntity);
-            DynamicBuffer<VertXZBufferElement> simpleVerts =
-                entityManager.GetBuffer<VertXZBufferElement>(singletonEntity);
+            DynamicBuffer<VertBufferElement> verts =
+                entityManager.GetBuffer<VertBufferElement>(singletonEntity);
             for (int i = 0; i < set.SimpleVertices.Length; i++)
             {
-                vertsY.Add(new VertYBufferElement { Y = set.GetVertY[i] });
-                simpleVerts.Add(new VertXZBufferElement { X = set.SimpleVertices[i].x, Z = set.SimpleVertices[i].y });
+                verts.Add(new VertBufferElement
+                {
+                    Position = new float3(set.SimpleVertices[i].x, set.GetVertY[i], set.SimpleVertices[i].y),
+                    WasUpdated = true
+                });
             }
 
             DynamicBuffer<NavTriangleBufferElement> triangles =
@@ -149,30 +156,42 @@ namespace Runtime.AI.Navigation
             for (int index = 0; index < set.Triangles.Length; index++)
             {
                 NavTriangle navTriangle = set.Triangles[index];
+                int neighborOne = navTriangle.Neighbors.Count > 0 ? navTriangle.Neighbors[0] : -1,
+                    neighborTwo = navTriangle.Neighbors.Count > 1 ? navTriangle.Neighbors[1] : -1,
+                    neighborThree = navTriangle.Neighbors.Count > 2 ? navTriangle.Neighbors[2] : -1;
+
+                int[] sharedOne = Shared(index, neighborOne, set.Triangles),
+                    sharedTwo = Shared(index, neighborTwo, set.Triangles),
+                    sharedThree = Shared(index, neighborThree, set.Triangles);
+
+
                 triangles.Add(
                     new NavTriangleBufferElement(
                         index,
                         navTriangle.GetA,
-                        navTriangle.GetB, navTriangle.GetC,
+                        navTriangle.GetB,
+                        navTriangle.GetC,
+                        0,
                         navTriangle.GetAB,
                         navTriangle.GetBC,
                         navTriangle.GetAC,
                         navTriangle.MaxY,
-                        simpleVerts[navTriangle.GetB].Distance(simpleVerts[navTriangle.GetA]),
-                        simpleVerts[navTriangle.GetB].Distance(simpleVerts[navTriangle.GetA]),
-                        simpleVerts[navTriangle.GetB].Distance(simpleVerts[navTriangle.GetA]),
+                        verts[sharedOne[0]].Distance2D(verts[sharedOne[1]]),
+                        neighborTwo != -1 ? verts[sharedTwo[0]].Distance2D(verts[sharedTwo[1]]) : 0,
+                        neighborThree != -1 ? verts[sharedThree[0]].Distance2D(verts[sharedThree[1]]) : 0,
                         navTriangle.GetEdgeAB,
                         navTriangle.GetEdgeBC,
                         navTriangle.GetEdgeAC,
-                        simpleVerts, vertsY,
-                        navTriangle.Neighbors.Count > 0 ? navTriangle.Neighbors[0] : -1,
-                        navTriangle.Neighbors.Count > 1 ? navTriangle.Neighbors[1] : -1,
-                        navTriangle.Neighbors.Count > 2 ? navTriangle.Neighbors[2] : -1));
+                        verts,
+                        neighborOne, neighborTwo, neighborThree,
+                        sharedOne,
+                        sharedTwo,
+                        sharedThree));
             }
 
             DynamicBuffer<AreaBufferElement> areaType = entityManager.GetBuffer<AreaBufferElement>(singletonEntity);
             foreach (int area in set.Areas)
-                areaType.Add(new AreaBufferElement() { AreaType = area });
+                areaType.Add(new AreaBufferElement { AreaType = area });
 
             component.GroupDivision = set.GetGroupDivisionSize();
 
@@ -201,11 +220,14 @@ namespace Runtime.AI.Navigation
                     navMeshCellComponent.Z = z;
                     entityManager.SetComponentData(cellEntity, navMeshCellComponent);
 
-                    DynamicBuffer<NavMeshCellTriangleIndexBufferElement> buffer =
+                    entityManager.AddBuffer<NavMeshCellVertIndexBufferElement>(cellEntity);
+
+                    DynamicBuffer<NavMeshCellTriangleIndexBufferElement> navMeshCellTriangleIndexBufferElement =
                         entityManager.AddBuffer<NavMeshCellTriangleIndexBufferElement>(cellEntity);
 
                     foreach (int triangleID in navMeshCells[x, z].GetTriangleIDs())
-                        buffer.Add(new NavMeshCellTriangleIndexBufferElement { Index = triangleID });
+                        navMeshCellTriangleIndexBufferElement.Add(new NavMeshCellTriangleIndexBufferElement
+                            { Index = triangleID });
                 }
             }
         }
@@ -214,51 +236,46 @@ namespace Runtime.AI.Navigation
 
         #region In
 
-        internal static void AddAgent(UnitAgent agent)
+        internal static Entity AddAgent(UnitAgent agent)
         {
-            if (allUnitAgents.Contains(agent)) return;
-
             allUnitAgents.Add(agent);
 
             agent.SetID(allUnitAgents.Count - 1);
 
             EntityManager entityManager = Unity.Entities.World.DefaultGameObjectInjectionWorld.EntityManager;
-            Entity e = entityManager.CreateEntity();
-            agent.SetEntity(e);
-            entityManager.SetName(e, agent.gameObject.name);
+            Entity entity = entityManager.CreateEntity();
+            entityManager.SetName(entity, agent.gameObject.name);
 
-            entityManager.AddComponent<UnitAgentComponent>(e);
-            UnitAgentComponent agentComponent = entityManager.GetComponentData<UnitAgentComponent>(e);
+            entityManager.AddComponent<UnitAgentComponent>(entity);
+            UnitAgentComponent agentComponent = entityManager.GetComponentData<UnitAgentComponent>(entity);
             agentComponent.ID = agent.GetID();
             agentComponent.CurrentTriangleID = -1;
-            entityManager.SetComponentData(e, agentComponent);
+            entityManager.SetComponentData(entity, agentComponent);
 
-            entityManager.AddComponent<DestinationComponent>(e);
-            entityManager.SetComponentEnabled<DestinationComponent>(e, false);
+            entityManager.AddComponent<DestinationComponent>(entity);
+            entityManager.SetComponentEnabled<DestinationComponent>(entity, false);
 
-
-            entityManager.AddComponent<AgentSettingsComponent>(e);
-            AgentSettingsComponent agentSettingsComponent = entityManager.GetComponentData<AgentSettingsComponent>(e);
+            entityManager.AddComponent<AgentSettingsComponent>(entity);
+            AgentSettingsComponent agentSettingsComponent =
+                entityManager.GetComponentData<AgentSettingsComponent>(entity);
             agentSettingsComponent.Radius = agent.Settings.Radius;
             agentSettingsComponent.ID = agent.Settings.ID;
-            entityManager.SetComponentData(e, agentSettingsComponent);
+            entityManager.SetComponentData(entity, agentSettingsComponent);
 
-            entityManager.AddComponent<LocalTransform>(e);
-            LocalTransform localTransform = entityManager.GetComponentData<LocalTransform>(e);
+            entityManager.AddComponent<LocalTransform>(entity);
+            LocalTransform localTransform = entityManager.GetComponentData<LocalTransform>(entity);
             localTransform.Position = agent.transform.position;
             localTransform.Rotation = agent.transform.rotation;
             localTransform.Scale = 1;
-            entityManager.SetComponentData(e, localTransform);
+            entityManager.SetComponentData(entity, localTransform);
 
-            entityManager.AddBuffer<WayPointBufferElement>(e);
-            entityManager.AddBuffer<AgentTrianglePathBufferElement>(e);
+            entityManager.AddBuffer<WayPointBufferElement>(entity);
+            entityManager.AddBuffer<AgentTrianglePathBufferElement>(entity);
 
-            if (navMesh == null) return;
-
-            //AddUnitToCell(agent);
+            return entity;
         }
 
-        internal static void RemoveAgent(UnitAgent agent)
+        internal static void RemoveAgent(UnitAgent agent, Entity? entity)
         {
             if (agent == null || !allUnitAgents.Contains(agent))
                 return;
@@ -267,8 +284,10 @@ namespace Runtime.AI.Navigation
 
             RemoveUnitFromCell(agent);
 
-            for (int i = agent.GetID(); i < allUnitAgents.Count; i++)
-                allUnitAgents[i].SetID(i);
+            EntityManager entityManager = Unity.Entities.World.DefaultGameObjectInjectionWorld.EntityManager;
+
+            if (entity.HasValue)
+                entityManager.DestroyEntity(entity.Value);
         }
 
         public static void AddOnNavMeshChange(UnityAction action)
@@ -1084,6 +1103,38 @@ namespace Runtime.AI.Navigation
                 g.SetID(index);
                 allWalkGroups[index] = g;
             }
+        }
+
+        private static int[] Shared(int current, int neighbor, NavTriangle[] triangles)
+        {
+            int[] result = { -1, -1 };
+
+            if (neighbor == -1)
+                return result;
+
+            int count = 0;
+
+            NavTriangle a = triangles[current], b = triangles[neighbor];
+
+            foreach (int aVertex in a.Vertices)
+            {
+                foreach (int bVertex in b.Vertices)
+                {
+                    if (aVertex != bVertex)
+                        continue;
+
+                    result[count] = aVertex;
+
+                    count++;
+
+                    if (count == 2)
+                        return result;
+
+                    break;
+                }
+            }
+
+            return result;
         }
 
         #endregion

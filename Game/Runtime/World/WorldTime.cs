@@ -87,6 +87,8 @@ namespace Runtime.World
 
         public static void AddLight(DayTimeLight light)
         {
+            _lights ??= new List<DayTimeLight>(64);
+
             _lights.Add(light);
         }
 

@@ -48,7 +48,7 @@ namespace Runtime.Player
         [SerializeField] [FoldoutGroup("Character Sheet")] [HideLabel]
         private CharacterSheet characterSheet;
 
-        [SerializeField] [BoxGroup("Variables/Camera")] [Required]
+        [SerializeField] [BoxGroup("Camera")] [Required]
         private CinemachineBrainVariable cameraBrain;
 
         [SerializeField] [BoxGroup("Events")] [Required]

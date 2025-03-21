@@ -2,7 +2,7 @@ using Unity.Entities;
 
 namespace Runtime.AI.EntityBuffers
 {
-    public struct TriangleFlattenStartIndexBufferElement : IBufferElementData
+    public struct VertInTrianglesFlattenIndexBufferElement : IBufferElementData
     {
         public int Index;
     }

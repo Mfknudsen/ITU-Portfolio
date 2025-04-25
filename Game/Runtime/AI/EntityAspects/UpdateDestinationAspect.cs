@@ -4,7 +4,7 @@ using Unity.Transforms;
 
 namespace Runtime.AI.EntityAspects
 {
-    public readonly partial struct UpdateDestinationAspect : IAspect
+    internal readonly partial struct UpdateDestinationAspect : IAspect
     {
         public readonly Entity Entity;
         public readonly RefRO<UnitAgentComponent> AgentComponent;

@@ -24,7 +24,7 @@ namespace Tests.Playmode
 
             GameObject obj = new GameObject("DummyAgent");
             obj.SetActive(false);
-            obj.AddComponent<UnitAgent>().SetSettings(UnitAgentSettings.CreateDummySettings());
+            obj.AddComponent<NavigationAgent>().SetSettings(UnitAgentSettings.CreateDummySettings());
             obj.SetActive(true);
             Assert.IsTrue(UnitNavigation.GetAllAgents().Count == 1);
             obj.SetActive(false);

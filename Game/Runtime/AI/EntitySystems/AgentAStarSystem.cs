@@ -16,50 +16,82 @@ namespace Runtime.AI.EntitySystems
     [BurstCompile]
     public partial struct AgentAStarSystem : ISystem
     {
-        [BurstCompile]
+        private EntityQuery entityQuery;
+
+        private BufferLookup<AgentTrianglePathBufferElement> agentPathLookup;
+        private ComponentLookup<DestinationComponent> destinationLookup;
+        private ComponentLookup<UnitAgentComponent> agentLookup;
+        private ComponentLookup<AgentSettingsComponent> agentSettingsLookup;
+
         public void OnCreate(ref SystemState state)
         {
             state.RequireForUpdate<NavigationMeshSingletonComponent>();
             state.RequireForUpdate<UnitAgentComponent>();
+
+            this.entityQuery = state.GetEntityQuery(ComponentType.ReadOnly<UnitAgentComponent>(),
+                ComponentType.ReadWrite<DestinationComponent>());
+
+            this.agentPathLookup = state.GetBufferLookup<AgentTrianglePathBufferElement>();
+            this.destinationLookup = state.GetComponentLookup<DestinationComponent>();
+            this.agentLookup = state.GetComponentLookup<UnitAgentComponent>(true);
+            this.agentSettingsLookup = state.GetComponentLookup<AgentSettingsComponent>(true);
         }
 
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            Entity navmeshEntity = SystemAPI.GetSingletonEntity<NavigationMeshSingletonComponent>();
+            if (!SystemAPI.TryGetSingletonEntity<NavigationMeshSingletonComponent>(out Entity navmeshEntity))
+                return;
 
-            DynamicBuffer<NavTriangleBufferElement> triangles =
-                SystemAPI.GetBuffer<NavTriangleBufferElement>(navmeshEntity);
-            DynamicBuffer<AreaBufferElement> areas = SystemAPI.GetBuffer<AreaBufferElement>(navmeshEntity);
+            NativeArray<Entity> entities = this.entityQuery
+                .ToEntityArray(Allocator.TempJob);
 
-            NativeList<Entity> entities = state.GetEntityQuery(ComponentType.ReadOnly<UnitAgentComponent>())
-                .ToEntityListAsync(Allocator.TempJob, state.Dependency, out JobHandle handle);
-            handle.Complete();
+            if (entities.Length == 0)
+            {
+                state.Dependency = entities.Dispose(state.Dependency);
+                return;
+            }
+
+            NativeArray<NavTriangleBufferElement> triangles =
+                SystemAPI.GetBuffer<NavTriangleBufferElement>(navmeshEntity).ToNativeArray(Allocator.TempJob);
+            NativeArray<AreaBufferElement> areas = SystemAPI.GetBuffer<AreaBufferElement>(navmeshEntity)
+                .ToNativeArray(Allocator.TempJob);
+
+            this.agentPathLookup.Update(ref state);
+            this.destinationLookup.Update(ref state);
+            this.agentLookup.Update(ref state);
+            this.agentSettingsLookup.Update(ref state);
+
+            int batch = math.max(entities.Length / SystemInfo.processorCount, 1);
 
             AgentAStarJob pathingJob = new AgentAStarJob(
-                entities,
-                triangles,
-                areas,
-                state.GetBufferLookup<AgentTrianglePathBufferElement>(),
-                state.GetComponentLookup<DestinationComponent>(),
-                state.GetComponentLookup<UnitAgentComponent>(true),
-                state.GetComponentLookup<AgentSettingsComponent>(true)
+                in entities,
+                in triangles,
+                in areas,
+                this.agentPathLookup,
+                this.destinationLookup,
+                this.agentLookup,
+                this.agentSettingsLookup
             );
-            state.Dependency = pathingJob.Schedule(entities, entities.Length / SystemInfo.processorCount,
-                state.Dependency);
-            state.CompleteDependency();
-            entities.Dispose();
+
+            JobHandle handle = pathingJob.ScheduleParallel(entities.Length, batch, state.Dependency);
+
+            JobHandle entitiesDispose = entities.Dispose(handle);
+            JobHandle trianglesDispose = triangles.Dispose(entitiesDispose);
+            JobHandle areasDispose = areas.Dispose(trianglesDispose);
+
+            state.Dependency = areasDispose;
         }
     }
 
     [BurstCompile]
-    internal struct AgentAStarJob : IJobParallelForDefer
+    internal struct AgentAStarJob : IJobFor
     {
-        [DeallocateOnJobCompletion] [ReadOnly] private readonly NativeArray<AreaBufferElement> areaTypes;
-        [DeallocateOnJobCompletion] [ReadOnly] private readonly NativeArray<NavTriangleBufferElement> triangles;
+        [ReadOnly] private NativeArray<AreaBufferElement> areaTypes;
+        [ReadOnly] private NativeArray<NavTriangleBufferElement> triangles;
 
         [NativeDisableParallelForRestriction] [ReadOnly]
-        private NativeList<Entity> entities;
+        private NativeArray<Entity> entities;
 
         [NativeDisableParallelForRestriction] [ReadOnly]
         private ComponentLookup<AgentSettingsComponent> agentSettingsLookup;
@@ -70,19 +102,18 @@ namespace Runtime.AI.EntitySystems
         [NativeDisableParallelForRestriction] private BufferLookup<AgentTrianglePathBufferElement> agentPathLookup;
         [NativeDisableParallelForRestriction] private ComponentLookup<DestinationComponent> destinationLookup;
 
-
         public AgentAStarJob(
-            NativeList<Entity> entities,
-            DynamicBuffer<NavTriangleBufferElement> triangles,
-            DynamicBuffer<AreaBufferElement> areaType,
-            BufferLookup<AgentTrianglePathBufferElement> agentPathLookup,
-            ComponentLookup<DestinationComponent> destinationLookup,
-            ComponentLookup<UnitAgentComponent> agentLookup,
-            ComponentLookup<AgentSettingsComponent> agentSettingsLookup) : this()
+            in NativeArray<Entity> entities,
+            in NativeArray<NavTriangleBufferElement> triangles,
+            in NativeArray<AreaBufferElement> areaType,
+            in BufferLookup<AgentTrianglePathBufferElement> agentPathLookup,
+            in ComponentLookup<DestinationComponent> destinationLookup,
+            in ComponentLookup<UnitAgentComponent> agentLookup,
+            in ComponentLookup<AgentSettingsComponent> agentSettingsLookup) : this()
         {
             this.entities = entities;
-            this.triangles = triangles.ToNativeArray(Allocator.TempJob);
-            this.areaTypes = areaType.ToNativeArray(Allocator.TempJob);
+            this.triangles = triangles;
+            this.areaTypes = areaType;
 
             this.agentPathLookup = agentPathLookup;
             this.destinationLookup = destinationLookup;
@@ -95,6 +126,7 @@ namespace Runtime.AI.EntitySystems
         {
             Entity entity = this.entities[index];
             UnitAgentComponent agent = this.agentLookup[entity];
+
             if (agent.CurrentTriangleID == -1)
                 return;
 
@@ -102,8 +134,11 @@ namespace Runtime.AI.EntitySystems
             if (destination.TriangleID == -1)
                 return;
 
-            AgentSettingsComponent agentSettings = this.agentSettingsLookup[entity];
+            if (!destination.Refresh)
+                return;
+
             DynamicBuffer<AgentTrianglePathBufferElement> agentPath = this.agentPathLookup[entity];
+            AgentSettingsComponent agentSettings = this.agentSettingsLookup[entity];
 
             NativePriorityHeap<JobNodeEcs> toCheckNodes =
                 new NativePriorityHeap<JobNodeEcs>(256, Allocator.Temp);
@@ -115,11 +150,13 @@ namespace Runtime.AI.EntitySystems
             toCheckNodes.Push(checking);
             results.Add(checking.ID, checking);
 
+#if UNITY_EDITOR && !UNITY_DOTSPLAYER
             if (destination.Debug)
             {
                 Debug.DrawRay(this.triangles[agent.CurrentTriangleID].Center, Vector3.up, Color.green);
                 Debug.DrawRay(this.triangles[destination.TriangleID].Center, Vector3.up, Color.green);
             }
+#endif
 
             while (toCheckNodes.Count > 0 && checking.ID != destination.TriangleID)
             {
@@ -156,8 +193,10 @@ namespace Runtime.AI.EntitySystems
                     if (results.ContainsKey(neighborTriangleId))
                         continue;
 
+#if UNITY_EDITOR && !UNITY_DOTSPLAYER
                     if (destination.Debug)
                         Debug.DrawLine(triangle.Center, this.triangles[neighborTriangleId].Center, Color.yellow);
+#endif
 
                     JobNodeEcs j = new JobNodeEcs(
                         this.triangles[neighborTriangleId],
@@ -172,10 +211,12 @@ namespace Runtime.AI.EntitySystems
                 }
             }
 
+#if UNITY_EDITOR && !UNITY_DOTSPLAYER
             if (checking.ID != destination.TriangleID)
             {
                 Debug.Log($"E: {toCheckNodes.Count}");
             }
+#endif
 
             //Retrace backwards towards current triangle
             int pathIndex = 0;
@@ -198,6 +239,8 @@ namespace Runtime.AI.EntitySystems
 
             toCheckNodes.Dispose();
             results.Dispose();
+
+            this.destinationLookup[entity] = destination;
         }
 
         private static void AddToPath(ref DynamicBuffer<AgentTrianglePathBufferElement> agentPath, ref int index,
@@ -238,7 +281,7 @@ namespace Runtime.AI.EntitySystems
         }
 
         public JobNodeEcs(in NavTriangleBufferElement currentTriangle,
-            float3 destination)
+            in float3 destination)
         {
             this.ParentID = -1;
             this.ID = currentTriangle.ID;

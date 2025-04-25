@@ -17,6 +17,7 @@ using Scene = UnityEngine.SceneManagement.Scene;
 
 namespace Runtime.AI.Navigation
 {
+#if UNITY_EDITOR
     public static class BuildNavigationMesh
     {
         private const float OverlapCheckDistance = .3f;
@@ -43,12 +44,12 @@ namespace Runtime.AI.Navigation
 
             return result;
         }
+#endif
 
         public static void DestroyDummyMesh(NavigationMesh mesh)
         {
             Object.DestroyImmediate(mesh);
         }
-#endif
 
         public static async UniTask<NavigationMesh> BakeNavmesh(TileSubController tileSubController,
             NavigationPoint[] navigationPoints)
@@ -73,6 +74,7 @@ namespace Runtime.AI.Navigation
                 #region Build navmesh triangulation
 
                 //Construct Navigation Mesh and setup custom navmesh logic
+
                 EditorUtility.DisplayProgressBar(editorProgressParTitle, "Calculation Navigation Mesh Triangulation",
                     0f);
 
@@ -338,6 +340,7 @@ namespace Runtime.AI.Navigation
             }
 
             //The progressbar is no longer needed.
+
             EditorUtility.ClearProgressBar();
 
             return calculatedNavMesh;
@@ -782,4 +785,5 @@ namespace Runtime.AI.Navigation
             }
         }
     }
+#endif
 }

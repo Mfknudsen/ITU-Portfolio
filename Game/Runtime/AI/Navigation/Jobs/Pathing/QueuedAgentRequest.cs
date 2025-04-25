@@ -12,13 +12,13 @@ namespace Runtime.AI.Navigation.Jobs.Pathing
 
         public readonly Vector3 Destination;
 
-        public readonly UnitAgent Agent;
+        public readonly NavigationAgent Agent;
 
         #endregion
 
         #region Build In States
 
-        public QueuedAgentRequest(Vector3 destination, UnitAgent agent)
+        public QueuedAgentRequest(Vector3 destination, NavigationAgent agent)
         {
             this.Destination = destination;
             this.Agent = agent;

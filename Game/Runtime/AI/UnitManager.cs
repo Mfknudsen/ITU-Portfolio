@@ -1,14 +1,13 @@
 #region Libraries
 
-using Runtime.Player;
-using Runtime.ScriptableEvents;
-using Runtime.Systems;
-using Runtime.Systems.PersistantRunner;
-using Sirenix.OdinInspector;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Runtime.Player;
 using Runtime.ScriptableVariables.Events;
+using Runtime.Systems;
+using Runtime.Systems.PersistantRunner;
+using Sirenix.OdinInspector;
 using UnityEngine;
 
 #endregion
@@ -20,11 +19,11 @@ namespace Runtime.AI
     {
         #region Values
 
-        [SerializeField, Required] private PlayerStateEvent playerStateChangeEvent;
+        [SerializeField] [Required] private PlayerStateEvent playerStateChangeEvent;
 
-        [SerializeField, Required] private PlayerManager playerManager;
+        [SerializeField] [Required] private PlayerManager playerManager;
 
-        [SerializeField, Min(1)] private int mediumDelay = 1, farDelay = 1;
+        [SerializeField] [Min(1)] private int mediumDelay = 1, farDelay = 1;
 
         [SerializeField] private float closeDistance, mediumDistance;
 
@@ -66,8 +65,10 @@ namespace Runtime.AI
             if (this.count * this.farDelay == this.count) this.count = 0;
         }
 
-        public void FrameLateUpdate() =>
+        public void FrameLateUpdate()
+        {
             this.UpdateUnitDistanceLists();
+        }
 
         public void Register(UnitBase add)
         {
@@ -142,8 +143,12 @@ namespace Runtime.AI
 
         #region Internal
 
-        protected override void OnManagerDisabled() =>
+#if UNITY_EDITOR
+        protected override void OnManagerDisabled()
+        {
             this.playerStateChangeEvent.RemoveListener(this.OnPlayerStateChange);
+        }
+#endif
 
         private void UpdateUnitDistanceLists()
         {

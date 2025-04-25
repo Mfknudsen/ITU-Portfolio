@@ -6,7 +6,7 @@ namespace Runtime.AI.EntityComponents
     {
         public int X, Z;
 
-        public int Size, NewSize;
+        public int TriangleSize, VertSize, CollisionSize, NewSize;
 
         public bool debug;
     }

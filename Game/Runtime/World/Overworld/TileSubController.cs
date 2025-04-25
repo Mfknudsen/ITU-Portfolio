@@ -135,9 +135,9 @@ namespace Runtime.World.Overworld
 
 #if UNITY_EDITOR
         public NavigationMesh GetNavmesh => this.navigationMesh;
+#endif
 
         public Vector3 GetCleanUpPoint => this.navmeshCleanUpPoint;
-#endif
 
         #endregion
 

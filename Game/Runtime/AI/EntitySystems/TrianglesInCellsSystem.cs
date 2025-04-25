@@ -13,100 +13,140 @@ namespace Runtime.AI.EntitySystems
     [UpdateInGroup(typeof(NavigationSystemGroup))]
     public partial struct TrianglesInCellsSystem : ISystem
     {
+        private EntityQuery entityQuery;
+
+        private BufferLookup<NavMeshCellTriangleIndexBufferElement> cellTrianglesLookup;
+        private ComponentLookup<NavMeshCellComponent> cellLookup;
+
+        private DynamicBuffer<NavTriangleBufferElement> navTriangleBufferElements;
+        private DynamicBuffer<VertBufferElement> vertBufferElements;
+        private DynamicBuffer<TriangleWasUpdatedBufferElement> triangleWasUpdateBufferElements;
+        private DynamicBuffer<TriangleFlattenBufferElement> triangleFlattenBufferElements;
+        private DynamicBuffer<TriangleFlattenIndexBufferElement> triangleIndexBufferElements;
+
+        private bool singletonReady;
+
         public void OnCreate(ref SystemState state)
         {
             state.RequireForUpdate<NavigationMeshSingletonComponent>();
+
+            this.entityQuery = state.GetEntityQuery(ComponentType.ReadOnly<NavMeshCellComponent>());
+
+            this.cellTrianglesLookup = state.GetBufferLookup<NavMeshCellTriangleIndexBufferElement>();
+            this.cellLookup = state.GetComponentLookup<NavMeshCellComponent>();
+
+            this.singletonReady = false;
         }
 
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            Entity singletonEntity = SystemAPI.GetSingletonEntity<NavigationMeshSingletonComponent>();
+            if (!this.singletonReady)
+            {
+                if (SystemAPI.TryGetSingletonEntity<NavigationMeshSingletonComponent>(out Entity navmeshEntity))
+                {
+                    this.navTriangleBufferElements =
+                        SystemAPI.GetBuffer<NavTriangleBufferElement>(navmeshEntity);
+                    this.vertBufferElements =
+                        SystemAPI.GetBuffer<VertBufferElement>(navmeshEntity);
+                    this.triangleWasUpdateBufferElements =
+                        SystemAPI.GetBuffer<TriangleWasUpdatedBufferElement>(navmeshEntity);
+                    this.triangleFlattenBufferElements =
+                        SystemAPI.GetBuffer<TriangleFlattenBufferElement>(navmeshEntity);
+                    this.triangleIndexBufferElements =
+                        SystemAPI.GetBuffer<TriangleFlattenIndexBufferElement>(navmeshEntity);
+
+                    this.singletonReady = true;
+                }
+                else
+                    return;
+            }
+
+            this.cellTrianglesLookup.Update(ref state);
+            this.cellLookup.Update(ref state);
+
             NavigationMeshSingletonComponent navmesh = SystemAPI.GetSingleton<NavigationMeshSingletonComponent>();
 
-            Debug.Log(navmesh.TrianglesWasUpdatedSize);
             if (navmesh.TrianglesWasUpdatedSize == 0)
                 return;
 
-            DynamicBuffer<NavTriangleBufferElement> navTriangleBufferElements =
-                SystemAPI.GetBuffer<NavTriangleBufferElement>(singletonEntity);
-            DynamicBuffer<VertBufferElement> vertBufferElements =
-                SystemAPI.GetBuffer<VertBufferElement>(singletonEntity);
-            DynamicBuffer<TriangleWasUpdatedBufferElement> wasUpdateBufferElements =
-                SystemAPI.GetBuffer<TriangleWasUpdatedBufferElement>(singletonEntity);
+            NativeArray<Entity> entities = this.entityQuery.ToEntityArray(Allocator.TempJob);
 
+            if (entities.Length == 0)
+            {
+                entities.Dispose();
+                return;
+            }
 
-            NativeList<Entity> entities = state.GetEntityQuery(ComponentType.ReadOnly<NavMeshCellComponent>())
-                .ToEntityListAsync(Allocator.TempJob, state.Dependency, out JobHandle handle);
-            handle.Complete();
+            int batch = math.max(entities.Length / SystemInfo.processorCount, 1);
 
             UpdateCellTriangleIndexListsJob updateCellTriangleIndexListsJob = new UpdateCellTriangleIndexListsJob(
-                entities,
-                navmesh.GroupDivision,
-                navmesh.MinFloorX,
-                navmesh.MinFloorZ,
-                vertBufferElements,
-                navTriangleBufferElements,
-                wasUpdateBufferElements,
-                state.GetBufferLookup<NavMeshCellTriangleIndexBufferElement>(),
-                state.GetComponentLookup<NavMeshCellComponent>());
+                entities, navmesh.GroupDivision, navmesh.MinFloorX, navmesh.MinFloorZ,
+                this.vertBufferElements,
+                this.navTriangleBufferElements,
+                this.triangleWasUpdateBufferElements,
+                this.cellTrianglesLookup,
+                this.cellLookup,
+                navmesh.TrianglesWasUpdatedSize);
             state.Dependency =
-                updateCellTriangleIndexListsJob.Schedule(entities, entities.Length / SystemInfo.processorCount,
-                    state.Dependency);
-            state.CompleteDependency();
+                updateCellTriangleIndexListsJob.ScheduleParallel(entities.Length, batch, state.Dependency);
+
 
             TriangleCellNeedUpdateChangeJob triangleCellNeedUpdateChangeJob =
-                new TriangleCellNeedUpdateChangeJob(ref navTriangleBufferElements);
-            JobHandle triangleCellNeedUpdateChangeHandle =
-                triangleCellNeedUpdateChangeJob.Schedule(navTriangleBufferElements.Length,
-                    navTriangleBufferElements.Length / SystemInfo.processorCount,
+                new TriangleCellNeedUpdateChangeJob(ref this.navTriangleBufferElements);
+            state.Dependency =
+                triangleCellNeedUpdateChangeJob.Schedule(this.navTriangleBufferElements.Length,
+                    this.navTriangleBufferElements.Length / SystemInfo.processorCount,
                     state.Dependency);
 
-            triangleCellNeedUpdateChangeHandle.Complete();
-
-            DynamicBuffer<TriangleFlattenBufferElement> triangleFlattenBufferElements =
-                SystemAPI.GetBuffer<TriangleFlattenBufferElement>(singletonEntity);
-            DynamicBuffer<TriangleFlattenIndexBufferElement> triangleIndexBufferElements =
-                SystemAPI.GetBuffer<TriangleFlattenIndexBufferElement>(singletonEntity);
+            state.CompleteDependency();
 
             int t = navmesh.CellXLength * navmesh.CellZLength;
-            if (triangleFlattenBufferElements.Length < t)
-                triangleFlattenBufferElements.AddRange(
-                    new NativeArray<TriangleFlattenBufferElement>(t - triangleFlattenBufferElements.Length,
+            if (this.triangleFlattenBufferElements.Length < t)
+                this.triangleFlattenBufferElements.AddRange(
+                    new NativeArray<TriangleFlattenBufferElement>(t - this.triangleFlattenBufferElements.Length,
                         Allocator.Temp));
 
             UpdateCellFlattenSizeJob updateCellFlattenSizeJob =
-                new UpdateCellFlattenSizeJob(triangleFlattenBufferElements, navmesh.CellXLength);
+                new UpdateCellFlattenSizeJob(this.triangleFlattenBufferElements, navmesh.CellXLength);
             JobHandle updateCellSizeAndStartHandle =
-                updateCellFlattenSizeJob.ScheduleParallel(triangleCellNeedUpdateChangeHandle);
+                updateCellFlattenSizeJob.ScheduleParallel(state.Dependency);
             state.Dependency = updateCellSizeAndStartHandle;
 
-            updateCellSizeAndStartHandle.Complete();
+            state.CompleteDependency();
 
-            for (int i = 1; i < triangleFlattenBufferElements.Length; i++)
+            for (int i = 1; i < this.triangleFlattenBufferElements.Length; i++)
             {
-                TriangleFlattenBufferElement flattenBuffer = triangleFlattenBufferElements[i];
+                TriangleFlattenBufferElement flattenBuffer = this.triangleFlattenBufferElements[i],
+                    previous = this.triangleFlattenBufferElements[i - 1];
                 flattenBuffer.StartIndex =
-                    triangleFlattenBufferElements[i - 1].StartIndex + triangleFlattenBufferElements[i - 1].Size;
-                triangleFlattenBufferElements[i] = flattenBuffer;
+                    previous.StartIndex + previous.Size;
+                this.triangleFlattenBufferElements[i] = flattenBuffer;
             }
 
             int totalCount = 0;
-            foreach (TriangleFlattenBufferElement triangleFlattenBufferElement in triangleFlattenBufferElements)
+            foreach (TriangleFlattenBufferElement triangleFlattenBufferElement in this.triangleFlattenBufferElements)
             {
                 totalCount += triangleFlattenBufferElement.Size;
             }
 
-            if (triangleIndexBufferElements.Length < totalCount)
-                triangleIndexBufferElements.AddRange(
-                    new NativeArray<TriangleFlattenIndexBufferElement>(totalCount - triangleIndexBufferElements.Length,
+            if (this.triangleIndexBufferElements.Length < totalCount)
+                this.triangleIndexBufferElements.AddRange(
+                    new NativeArray<TriangleFlattenIndexBufferElement>(
+                        totalCount - this.triangleIndexBufferElements.Length,
                         Allocator.Temp));
 
             UpdateCellFlattenIndexJob updateCellFlattenIndexJob =
-                new UpdateCellFlattenIndexJob(triangleIndexBufferElements, triangleFlattenBufferElements,
+                new UpdateCellFlattenIndexJob(
+                    entities,
+                    this.triangleIndexBufferElements,
+                    this.triangleFlattenBufferElements,
+                    this.cellLookup,
+                    this.cellTrianglesLookup,
                     navmesh.CellXLength);
-            JobHandle updateCellFlattenIndexHandle = updateCellFlattenIndexJob.ScheduleParallel(state.Dependency);
-            state.Dependency = updateCellFlattenIndexHandle;
+            JobHandle handle = updateCellFlattenIndexJob.ScheduleParallel(entities.Length, batch, state.Dependency);
+            state.Dependency = handle;
+            state.Dependency = entities.Dispose(handle);
         }
     }
 
@@ -170,7 +210,7 @@ namespace Runtime.AI.EntitySystems
     }
 
     [BurstCompile]
-    internal struct UpdateCellTriangleIndexListsJob : IJobParallelForDefer, IDisposable
+    internal struct UpdateCellTriangleIndexListsJob : IJobFor
     {
         [ReadOnly] private readonly float groupDivision, groupDivisionSquared;
 
@@ -183,21 +223,23 @@ namespace Runtime.AI.EntitySystems
         private NativeArray<TriangleWasUpdatedBufferElement> wasUpdateBufferElements;
 
         [NativeDisableParallelForRestriction] [ReadOnly]
-        private NativeList<Entity> entities;
+        private NativeArray<Entity> entities;
 
         [NativeDisableParallelForRestriction]
         private BufferLookup<NavMeshCellTriangleIndexBufferElement> cellTrianglesLookup;
 
         [NativeDisableParallelForRestriction] private ComponentLookup<NavMeshCellComponent> cellLookup;
 
+        private readonly int wasUpdatedCount;
+
         public UpdateCellTriangleIndexListsJob(
-            NativeList<Entity> entities,
+            NativeArray<Entity> entities,
             float groupDivision, float minFloorX, float minFloorZ,
             DynamicBuffer<VertBufferElement> simpleVerts,
             DynamicBuffer<NavTriangleBufferElement> triangles,
             DynamicBuffer<TriangleWasUpdatedBufferElement> wasUpdateBufferElements,
             BufferLookup<NavMeshCellTriangleIndexBufferElement> cellTrianglesLookup,
-            ComponentLookup<NavMeshCellComponent> cellLookup) : this()
+            ComponentLookup<NavMeshCellComponent> cellLookup, int wasUpdatedCount) : this()
         {
             this.entities = entities;
             this.groupDivision = groupDivision;
@@ -210,6 +252,8 @@ namespace Runtime.AI.EntitySystems
 
             this.cellTrianglesLookup = cellTrianglesLookup;
             this.cellLookup = cellLookup;
+
+            this.wasUpdatedCount = wasUpdatedCount;
         }
 
         [BurstCompile]
@@ -230,12 +274,12 @@ namespace Runtime.AI.EntitySystems
 
             NativeArray<int> reuseArray = new NativeArray<int>(3, Allocator.Temp);
 
-            int count = 0;
+            int count = cellComponent.TriangleSize;
 
-            //foreach (TriangleWasUpdatedBufferElement wasUpdateBufferElement in this.wasUpdateBufferElements)
-            foreach (NavTriangleBufferElement navTriangleBufferElement in this.triangles)
+            for (int i = 0; i < this.wasUpdatedCount; i++)
             {
-                //NavTriangleBufferElement navTriangleBufferElement = this.triangles[wasUpdateBufferElement.Index];
+                NavTriangleBufferElement navTriangleBufferElement =
+                    this.triangles[this.wasUpdateBufferElements[i].Index];
 
                 if (QuickSquareDistance(center,
                         navTriangleBufferElement.Center.x, navTriangleBufferElement.Center.z) >
@@ -246,13 +290,13 @@ namespace Runtime.AI.EntitySystems
 
                 bool inserted = false;
 
-                foreach (int i in reuseArray)
+                foreach (int vertIndex in reuseArray)
                 {
-                    VertBufferElement v = this.verts[i];
-                    if (check.Contains(i) || (v.Position.x >= xMin &&
-                                              v.Position.x <= xMax &&
-                                              v.Position.z >= zMin &&
-                                              v.Position.z <= zMax)) continue;
+                    VertBufferElement v = this.verts[vertIndex];
+                    if (check.Contains(vertIndex) || (v.Position.x >= xMin &&
+                                                      v.Position.x <= xMax &&
+                                                      v.Position.z >= zMin &&
+                                                      v.Position.z <= zMax)) continue;
 
                     if (cellTriangles.Length > count)
                     {
@@ -308,7 +352,8 @@ namespace Runtime.AI.EntitySystems
                 }
             }
 
-            cellComponent.Size = count;
+            cellComponent.TriangleSize = count;
+            this.cellLookup[entity] = cellComponent;
         }
 
         [BurstCompile]
@@ -370,13 +415,6 @@ namespace Runtime.AI.EntitySystems
             // Check if either intersection point is within the bounds of the line segment (0 <= t <= 1)
             return t1 is >= 0 and <= 1 || t2 is >= 0 and <= 1;
         }
-
-        public void Dispose()
-        {
-            this.verts.Dispose();
-            this.triangles.Dispose();
-            this.wasUpdateBufferElements.Dispose();
-        }
     }
 
     [BurstCompile]
@@ -385,10 +423,9 @@ namespace Runtime.AI.EntitySystems
         [DeallocateOnJobCompletion] [ReadOnly]
         private NativeArray<TriangleFlattenBufferElement> triangleFlattenBufferElements;
 
-        [WriteOnly] public NativeList<TriangleFlattenIndexBufferElement> TriangleIndexBufferElements;
+        [WriteOnly] private NativeList<TriangleFlattenIndexBufferElement> triangleIndexBufferElements;
 
-        private int cellXLength;
-
+        private readonly int cellXLength;
 
         public void Execute(
             ref DynamicBuffer<NavMeshCellTriangleIndexBufferElement> navMeshCellTriangleIndexBufferElements,
@@ -402,7 +439,7 @@ namespace Runtime.AI.EntitySystems
             int startIndex = index > 0 ? this.triangleFlattenBufferElements[index].StartIndex - 1 : 0;
             foreach (NavMeshCellTriangleIndexBufferElement triangleElement in navMeshCellTriangleIndexBufferElements)
             {
-                this.TriangleIndexBufferElements[startIndex] =
+                this.triangleIndexBufferElements[startIndex] =
                     new TriangleFlattenIndexBufferElement { Index = triangleElement.Index };
             }
         }
@@ -423,48 +460,70 @@ namespace Runtime.AI.EntitySystems
             this.cellXLength = cellXLength;
         }
 
-
         [BurstCompile]
         public void Execute(in NavMeshCellComponent cellComponent)
         {
             int i = cellComponent.X * this.cellXLength + cellComponent.Z;
             TriangleFlattenBufferElement t = this.triangleFlattenBufferElements[i];
-            t.Size = cellComponent.Size;
+            t.Size = cellComponent.TriangleSize;
             this.triangleFlattenBufferElements[i] = t;
         }
     }
 
     [BurstCompile]
-    internal partial struct UpdateCellFlattenIndexJob : IJobEntity
+    internal struct UpdateCellFlattenIndexJob : IJobFor, IDisposable
     {
+        [NativeDisableParallelForRestriction] [ReadOnly]
+        private NativeArray<Entity> entities;
+
         [NativeDisableParallelForRestriction]
         private DynamicBuffer<TriangleFlattenIndexBufferElement> triangleIndexBufferElements;
 
-        [DeallocateOnJobCompletion] [ReadOnly]
-        private NativeArray<TriangleFlattenBufferElement> triangleFlattenBufferElements;
+        [NativeDisableParallelForRestriction] [ReadOnly]
+        private DynamicBuffer<TriangleFlattenBufferElement> triangleFlattenBufferElements;
+
+        [NativeDisableParallelForRestriction] [ReadOnly]
+        private ComponentLookup<NavMeshCellComponent> cellLookup;
+
+        [NativeDisableParallelForRestriction] [ReadOnly]
+        private BufferLookup<NavMeshCellTriangleIndexBufferElement> cellTriangleIndexBufferLookup;
 
         private readonly int cellXLength;
 
-        public UpdateCellFlattenIndexJob(DynamicBuffer<TriangleFlattenIndexBufferElement> triangleIndexBufferElements,
-            DynamicBuffer<TriangleFlattenBufferElement> triangleFlattenBufferElements, int cellXLength) :
-            this()
+        public UpdateCellFlattenIndexJob(NativeArray<Entity> entities,
+            DynamicBuffer<TriangleFlattenIndexBufferElement> triangleIndexBufferElements,
+            DynamicBuffer<TriangleFlattenBufferElement> triangleFlattenBufferElements,
+            ComponentLookup<NavMeshCellComponent> cellLookup,
+            BufferLookup<NavMeshCellTriangleIndexBufferElement> cellTriangleIndexBufferLookup, int cellXLength)
         {
+            this.entities = entities;
             this.triangleIndexBufferElements = triangleIndexBufferElements;
-            this.triangleFlattenBufferElements = triangleFlattenBufferElements.ToNativeArray(Allocator.TempJob);
+            this.triangleFlattenBufferElements = triangleFlattenBufferElements;
+            this.cellLookup = cellLookup;
+            this.cellTriangleIndexBufferLookup = cellTriangleIndexBufferLookup;
             this.cellXLength = cellXLength;
         }
 
-        public void Execute(in NavMeshCellComponent cellComponent,
-            in DynamicBuffer<NavMeshCellTriangleIndexBufferElement> cellTriangleIndexBufferElements)
+        public void Execute(int index)
         {
+            Entity entity = this.entities[index];
+            NavMeshCellComponent cellComponent = this.cellLookup[entity];
+            DynamicBuffer<NavMeshCellTriangleIndexBufferElement> cellTriangleIndexBufferElements =
+                this.cellTriangleIndexBufferLookup[entity];
+
             TriangleFlattenBufferElement f =
                 this.triangleFlattenBufferElements[cellComponent.X * this.cellXLength + cellComponent.Z];
-            for (int i = 0; i < cellComponent.Size; i++)
+            for (int i = 0; i < cellComponent.TriangleSize; i++)
             {
                 TriangleFlattenIndexBufferElement t = this.triangleIndexBufferElements[f.StartIndex + i];
                 t.Index = cellTriangleIndexBufferElements[i].Index;
                 this.triangleIndexBufferElements[f.StartIndex + i] = t;
             }
+        }
+
+        public void Dispose()
+        {
+            this.entities.Dispose();
         }
     }
 

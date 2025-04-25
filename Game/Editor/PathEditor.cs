@@ -8,6 +8,7 @@ using UnityEngine;
 
 namespace Editor
 {
+#if UNITY_EDITOR
     [CustomEditor(typeof(PathCreator))]
     public class PathEditor : UnityEditor.Editor
     {
@@ -167,4 +168,5 @@ namespace Editor
             }
         }
     }
+#endif
 }

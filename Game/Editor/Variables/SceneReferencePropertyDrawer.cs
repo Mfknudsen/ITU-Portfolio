@@ -3,13 +3,16 @@
 using System.Linq;
 using Runtime.Variables;
 using UnityEditor;
+#if UNITY_EDITOR
 using UnityEditor.VersionControl;
+#endif
 using UnityEngine;
 
 #endregion
 
 namespace Editor.Variables
 {
+#if UNITY_EDITOR
     /// <summary>
     /// Display a Scene Reference object in the editor.
     /// If scene is valid, provides basic buttons to interact with the scene's role in Build Settings.
@@ -19,6 +22,7 @@ namespace Editor.Variables
     {
         // The exact name of the asset Object variable in the SceneReference object
         private const string sceneAssetPropertyString = "sceneAsset";
+
         // The exact name of the scene Path variable in the SceneReference object
         private const string scenePathPropertyString = "scenePath";
 
@@ -40,12 +44,14 @@ namespace Editor.Variables
                 GUI.Label(position, "Scene multiediting not supported");
                 return;
             }
+
             SerializedProperty sceneAssetProperty = GetSceneAssetProperty(property);
             // label.tooltip = "The actual Scene Asset reference.\nOn serialize this is also stored as the asset's path.";
             int sceneControlID = GUIUtility.GetControlID(FocusType.Passive);
             EditorGUI.BeginChangeCheck();
             {
-                sceneAssetProperty.objectReferenceValue = EditorGUI.ObjectField(position, label, sceneAssetProperty.objectReferenceValue, typeof(SceneAsset), false);
+                sceneAssetProperty.objectReferenceValue = EditorGUI.ObjectField(position, label,
+                    sceneAssetProperty.objectReferenceValue, typeof(SceneAsset), false);
             }
             if (EditorGUI.EndChangeCheck())
             {
@@ -65,7 +71,8 @@ namespace Editor.Variables
         private void DrawSceneInfoGUI(Rect position, BuildUtils.BuildScene buildScene, int sceneControlID)
         {
             bool readOnly = BuildUtils.IsReadOnly();
-            string readOnlyWarning = readOnly ? "\n\nWARNING: Build Settings is not checked out and so cannot be modified." : "";
+            string readOnlyWarning =
+                readOnly ? "\n\nWARNING: Build Settings is not checked out and so cannot be modified." : "";
 
             // Label Prefix
             GUIContent iconContent = new();
@@ -83,14 +90,16 @@ namespace Editor.Variables
             {
                 iconContent = EditorGUIUtility.IconContent("d_winbtn_mac_max");
                 labelContent.text = "BuildIndex: " + buildScene.buildIndex;
-                labelContent.tooltip = "This scene is in build settings and ENABLED.\nIt will be included in builds." + readOnlyWarning;
+                labelContent.tooltip = "This scene is in build settings and ENABLED.\nIt will be included in builds." +
+                                       readOnlyWarning;
             }
             // In build scenes and disabled
             else
             {
                 iconContent = EditorGUIUtility.IconContent("d_winbtn_mac_min");
                 labelContent.text = "BuildIndex: " + buildScene.buildIndex;
-                labelContent.tooltip = "This scene is in build settings and DISABLED.\nIt will be NOT included in builds.";
+                labelContent.tooltip =
+                    "This scene is in build settings and DISABLED.\nIt will be NOT included in builds.";
             }
 
             // Left status label
@@ -117,8 +126,11 @@ namespace Editor.Variables
                 {
                     buttonRect.width *= 2;
                     int addIndex = EditorBuildSettings.scenes.Length;
-                    tooltipMsg = "Add this scene to build settings. It will be appended to the end of the build scenes as buildIndex: " + addIndex + "." + readOnlyWarning;
-                    if (DrawUtils.ButtonHelper(buttonRect, "Add...", "Add (buildIndex " + addIndex + ")", EditorStyles.miniButtonLeft, tooltipMsg))
+                    tooltipMsg =
+                        "Add this scene to build settings. It will be appended to the end of the build scenes as buildIndex: " +
+                        addIndex + "." + readOnlyWarning;
+                    if (DrawUtils.ButtonHelper(buttonRect, "Add...", "Add (buildIndex " + addIndex + ")",
+                            EditorStyles.miniButtonLeft, tooltipMsg))
                         BuildUtils.AddBuildScene(buildScene);
                     buttonRect.width /= 2;
                     buttonRect.x += buttonRect.width;
@@ -128,14 +140,21 @@ namespace Editor.Variables
                 {
                     bool isEnabled = buildScene.scene.enabled;
                     string stateString = isEnabled ? "Disable" : "Enable";
-                    tooltipMsg = stateString + " this scene in build settings.\n" + (isEnabled ? "It will no longer be included in builds" : "It will be included in builds") + "." + readOnlyWarning;
+                    tooltipMsg = stateString + " this scene in build settings.\n" +
+                                 (isEnabled
+                                     ? "It will no longer be included in builds"
+                                     : "It will be included in builds") + "." + readOnlyWarning;
 
-                    if (DrawUtils.ButtonHelper(buttonRect, stateString, stateString + " In Build", EditorStyles.miniButtonLeft, tooltipMsg))
+                    if (DrawUtils.ButtonHelper(buttonRect, stateString, stateString + " In Build",
+                            EditorStyles.miniButtonLeft, tooltipMsg))
                         BuildUtils.SetBuildSceneState(buildScene, !isEnabled);
                     buttonRect.x += buttonRect.width;
 
-                    tooltipMsg = "Completely remove this scene from build settings.\nYou will need to add it again for it to be included in builds!" + readOnlyWarning;
-                    if (DrawUtils.ButtonHelper(buttonRect, "Remove...", "Remove from Build", EditorStyles.miniButtonMid, tooltipMsg))
+                    tooltipMsg =
+                        "Completely remove this scene from build settings.\nYou will need to add it again for it to be included in builds!" +
+                        readOnlyWarning;
+                    if (DrawUtils.ButtonHelper(buttonRect, "Remove...", "Remove from Build", EditorStyles.miniButtonMid,
+                            tooltipMsg))
                         BuildUtils.RemoveBuildScene(buildScene);
                 }
             }
@@ -143,11 +162,11 @@ namespace Editor.Variables
             buttonRect.x += buttonRect.width;
 
             tooltipMsg = "Open the 'Build Settings' Window for managing scenes." + readOnlyWarning;
-            if (DrawUtils.ButtonHelper(buttonRect, "Settings", "Build Settings", EditorStyles.miniButtonRight, tooltipMsg))
+            if (DrawUtils.ButtonHelper(buttonRect, "Settings", "Build Settings", EditorStyles.miniButtonRight,
+                    tooltipMsg))
             {
                 BuildUtils.OpenBuildSettings();
             }
-
         }
 
         private static SerializedProperty GetSceneAssetProperty(SerializedProperty property)
@@ -165,7 +184,8 @@ namespace Editor.Variables
             /// <summary>
             /// Draw a GUI button, choosing between a short and a long button text based on if it fits
             /// </summary>
-            public static bool ButtonHelper(Rect position, string msgShort, string msgLong, GUIStyle style, string tooltip = null)
+            public static bool ButtonHelper(Rect position, string msgShort, string msgLong, GUIStyle style,
+                string tooltip = null)
             {
                 GUIContent content = new(msgLong) { tooltip = tooltip };
 
@@ -184,6 +204,7 @@ namespace Editor.Variables
                 position.x += EditorGUIUtility.labelWidth;
                 return position;
             }
+
             /// <summary>
             /// Given a position rect, get its label portion
             /// </summary>
@@ -296,12 +317,14 @@ namespace Editor.Variables
             {
                 bool modified = false;
                 EditorBuildSettingsScene[] scenesToModify = EditorBuildSettings.scenes;
-                foreach (EditorBuildSettingsScene curScene in scenesToModify.Where(curScene => curScene.guid.Equals(buildScene.assetGUID)))
+                foreach (EditorBuildSettingsScene curScene in scenesToModify.Where(curScene =>
+                             curScene.guid.Equals(buildScene.assetGUID)))
                 {
                     curScene.enabled = enabled;
                     modified = true;
                     break;
                 }
+
                 if (modified) EditorBuildSettings.scenes = scenesToModify;
             }
 
@@ -334,7 +357,8 @@ namespace Editor.Variables
                 }
 
                 EditorBuildSettingsScene newScene = new(buildScene.assetGUID, enabled);
-                System.Collections.Generic.List<EditorBuildSettingsScene> tempScenes = EditorBuildSettings.scenes.ToList();
+                System.Collections.Generic.List<EditorBuildSettingsScene> tempScenes =
+                    EditorBuildSettings.scenes.ToList();
                 tempScenes.Add(newScene);
                 EditorBuildSettings.scenes = tempScenes.ToArray();
             }
@@ -350,7 +374,8 @@ namespace Editor.Variables
                     int selection = -1;
 
                     string title = "Remove Scene From Build";
-                    string details = $"You are about to remove the following scene from build settings:\n    {buildScene.assetPath}\n    buildIndex: {buildScene.buildIndex}\n\nThis will modify build settings, but the scene asset will remain untouched.";
+                    string details =
+                        $"You are about to remove the following scene from build settings:\n    {buildScene.assetPath}\n    buildIndex: {buildScene.buildIndex}\n\nThis will modify build settings, but the scene asset will remain untouched.";
                     string confirm = "Remove From Build";
                     string alt = "Just Disable";
                     string cancel = "Cancel (do nothing)";
@@ -386,7 +411,8 @@ namespace Editor.Variables
                 // User chose to fully remove the scene from build settings
                 else
                 {
-                    System.Collections.Generic.List<EditorBuildSettingsScene> tempScenes = EditorBuildSettings.scenes.ToList();
+                    System.Collections.Generic.List<EditorBuildSettingsScene> tempScenes =
+                        EditorBuildSettings.scenes.ToList();
                     tempScenes.RemoveAll(scene => scene.guid.Equals(buildScene.assetGUID));
                     EditorBuildSettings.scenes = tempScenes.ToArray();
                 }
@@ -401,4 +427,5 @@ namespace Editor.Variables
             }
         }
     }
+#endif
 }

@@ -7,6 +7,7 @@ using UnityEngine;
 
 namespace Editor.World.River
 {
+#if UNITY_EDITOR
     [CustomEditor(typeof(RiverConstructor))]
     public sealed class RiverConstructorEditor : UnityEditor.Editor
     {
@@ -17,7 +18,7 @@ namespace Editor.World.River
 
         private int selectedIndex = -1;
         private float pointRadius;
-        
+
         #endregion
 
         #region Build In States
@@ -39,20 +40,19 @@ namespace Editor.World.River
             {
                 return;
             }
-            
+
             if (!Input.GetKey(KeyCode.LeftControl) && !Input.GetKey(KeyCode.RightControl))
                 return;
 
             if (Input.GetKeyDown(ADD_KEY_CODE))
             {
-                
             }
             else if (Input.GetKeyDown(REMOVE_KEY_CODE))
             {
-                
             }
         }
-        
+
         #endregion
     }
+#endif
 }

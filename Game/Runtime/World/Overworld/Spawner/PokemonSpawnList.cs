@@ -1,9 +1,9 @@
 #region Libraries
 
-using Runtime.Pokémon;
 using System;
-using Runtime.Pokémon.Pokédex;
+using Runtime.Pokémon;
 using UnityEngine;
+using Random = UnityEngine.Random;
 
 #endregion
 
@@ -14,8 +14,7 @@ namespace Runtime.World.Overworld.Spawner
     {
         #region Values
 
-        [SerializeField]
-        private PokémonSpawnListEntity[] list;
+        [SerializeField] private PokémonSpawnListEntity[] list;
 
         #endregion
 
@@ -27,18 +26,18 @@ namespace Runtime.World.Overworld.Spawner
             foreach (PokémonSpawnListEntity pokemon in this.list)
                 total += pokemon.encounterRate;
 
-            float encounter = UnityEngine.Random.Range(0, total);
+            float encounter = Random.Range(0, total);
             float current = 0;
 
             for (int i = 0; i < this.list.Length; i++)
             {
                 PokémonSpawnListEntity entity = this.list[i];
                 if (i == 0 && encounter <= entity.encounterRate)
-                    return entity.pokemon.Get;
+                    return entity.pokemon;
                 else if (i == this.list.Length - 1)
-                    return entity.pokemon.Get;
+                    return entity.pokemon;
                 else if (encounter < current + entity.encounterRate)
-                    return entity.pokemon.Get;
+                    return entity.pokemon;
 
                 current += entity.encounterRate;
             }
@@ -54,7 +53,7 @@ namespace Runtime.World.Overworld.Spawner
     {
         #region Values
 
-        public PokemonGetter pokemon;
+        public Pokemon pokemon;
         public float encounterRate;
         public int maxActiveEntities;
 

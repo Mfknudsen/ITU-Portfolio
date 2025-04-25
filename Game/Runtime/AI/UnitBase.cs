@@ -17,7 +17,7 @@ using UnityEngine.Events;
 
 namespace Runtime.AI
 {
-    [RequireComponent(typeof(UnitAgent), typeof(BehaviourTreeOwner))]
+    [RequireComponent(typeof(NavigationAgent), typeof(BehaviourTreeOwner))]
     public abstract class UnitBase : MonoBehaviour, IInteractable
     {
         #region Values
@@ -29,7 +29,7 @@ namespace Runtime.AI
         protected GameObject visualsObject;
 
         [SerializeField, FoldoutGroup("Base/Navmesh"), Required]
-        protected UnitAgent agent;
+        protected NavigationAgent agent;
 
         [SerializeField, FoldoutGroup("Base/Senses")]
         private UnitSight sightCone;
@@ -65,7 +65,7 @@ namespace Runtime.AI
 
         #region Getters
 
-        public UnitAgent GetAgent() =>
+        public NavigationAgent GetAgent() =>
             this.agent;
 
         public TObject GetFromMemory<TObject>(string key) where TObject : Object

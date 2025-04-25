@@ -20,7 +20,7 @@ namespace Editor.Tests
 
         [SerializeField] private NavigationMesh navMesh;
 
-        [SerializeField] private List<UnitAgent> agents;
+        [SerializeField] private List<NavigationAgent> agents;
 
         private const int SpawnCount = 16;
         private const float Rotate = 360f / SpawnCount, SpawnDistance = 7f;
@@ -68,7 +68,7 @@ namespace Editor.Tests
 
             Debug.Log("All have path");
 
-            foreach (UnitAgent unitAgent in this.agents)
+            foreach (NavigationAgent unitAgent in this.agents)
                 unitAgent.SetStopped(false);
         }
 
@@ -82,20 +82,20 @@ namespace Editor.Tests
             if (this.agentPrefab == null)
                 return;
 
-            if (this.agentPrefab.GetComponent<UnitAgent>() == null)
+            if (this.agentPrefab.GetComponent<NavigationAgent>() == null)
                 return;
 
             if (this.agents != null)
             {
                 while (this.agents.Count > 0)
                 {
-                    UnitAgent a = this.agents[0];
+                    NavigationAgent a = this.agents[0];
                     this.agents.RemoveAt(0);
                     DestroyImmediate(a.gameObject);
                 }
             }
             else
-                this.agents = new List<UnitAgent>();
+                this.agents = new List<NavigationAgent>();
 
             Quaternion startRotation = this.transform.rotation;
             Transform parent = FindObjectOfType<TileAI>().transform;
@@ -106,7 +106,7 @@ namespace Editor.Tests
                 this.transform.Rotate(Vector3.up, Rotate * i);
                 this.agents.Add(Instantiate(this.agentPrefab,
                     this.transform.position + this.transform.forward * SpawnDistance,
-                    Quaternion.LookRotation(-this.transform.forward), parent).GetComponent<UnitAgent>());
+                    Quaternion.LookRotation(-this.transform.forward), parent).GetComponent<NavigationAgent>());
             }
         }
 

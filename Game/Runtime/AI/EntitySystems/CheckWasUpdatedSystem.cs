@@ -20,21 +20,25 @@ namespace Runtime.AI.EntitySystems
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            Entity navmeshEntity = SystemAPI.GetSingletonEntity<NavigationMeshSingletonComponent>();
-            NavigationMeshSingletonComponent navigationMeshSingletonComponent =
-                SystemAPI.GetComponent<NavigationMeshSingletonComponent>(navmeshEntity);
+            if (!SystemAPI.TryGetSingletonEntity<NavigationMeshSingletonComponent>(out Entity navmeshEntity))
+                return;
 
             DynamicBuffer<VertWasUpdatedBufferElement> vertWasUpdatedBufferElements =
                 SystemAPI.GetBuffer<VertWasUpdatedBufferElement>(navmeshEntity);
-
-            DynamicBuffer<VertBufferElement> vertBufferElements =
-                SystemAPI.GetBuffer<VertBufferElement>(navmeshEntity);
+            DynamicBuffer<VertBufferElement> vertBufferElements = SystemAPI.GetBuffer<VertBufferElement>(navmeshEntity);
+            DynamicBuffer<NavTriangleBufferElement> triangles =
+                SystemAPI.GetBuffer<NavTriangleBufferElement>(navmeshEntity);
+            DynamicBuffer<TriangleWasUpdatedBufferElement> triangleWasUpdateBufferElements =
+                SystemAPI.GetBuffer<TriangleWasUpdatedBufferElement>(navmeshEntity);
+            NavigationMeshSingletonComponent navigationMeshSingletonComponent =
+                SystemAPI.GetSingleton<NavigationMeshSingletonComponent>();
 
             NativeQueue<int> results = new NativeQueue<int>(Allocator.TempJob);
             results.AsParallelWriter();
 
-            CheckVertWasUpdatedJob checkVertWasUpdatedJob =
-                new CheckVertWasUpdatedJob(ref results, vertBufferElements);
+            CheckVertWasUpdatedJob checkVertWasUpdatedJob = new CheckVertWasUpdatedJob(
+                ref results,
+                vertBufferElements);
             state.Dependency = checkVertWasUpdatedJob.Schedule(vertBufferElements.Length, 64, state.Dependency);
             state.Dependency.Complete();
 
@@ -58,17 +62,19 @@ namespace Runtime.AI.EntitySystems
             navigationMeshSingletonComponent.VertsWasUpdatedSize = count;
             results.Clear();
 
-            DynamicBuffer<NavTriangleBufferElement> triangles =
-                SystemAPI.GetBuffer<NavTriangleBufferElement>(navmeshEntity);
+            if (count == 0)
+            {
+                SystemAPI.SetComponent(navmeshEntity, navigationMeshSingletonComponent);
+                results.Dispose();
+                return;
+            }
 
             CheckTriangleWasUpdateJob checkTriangleWasUpdateJob =
                 new CheckTriangleWasUpdateJob(ref results, triangles, vertBufferElements);
             state.Dependency = checkTriangleWasUpdateJob.Schedule(triangles.Length, 64, state.Dependency);
-            state.Dependency.Complete();
+            state.CompleteDependency();
 
             count = 0;
-            DynamicBuffer<TriangleWasUpdatedBufferElement> triangleWasUpdateBufferElements =
-                SystemAPI.GetBuffer<TriangleWasUpdatedBufferElement>(navmeshEntity);
 
             while (results.Count > 0)
             {

@@ -10,7 +10,7 @@ namespace Runtime.AI.Navigation.RayCast
 {
     public static class NavigationRayCast
     {
-        public static bool DoRayCast(this List<NavigationRayCastObject> objects, UnitAgent agent, Vector2 direction,
+        public static bool DoRayCast(this List<NavigationRayCastObject> objects, NavigationAgent agent, Vector2 direction,
             out RayHitResult result)
         {
             Vector2 hit = Vector2.zero;

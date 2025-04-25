@@ -11,48 +11,75 @@ namespace Runtime.AI.EntitySystems
     [UpdateInGroup(typeof(NavigationSystemGroup), OrderLast = true)]
     internal partial struct SetWasUpdatedDoneSystem : ISystem
     {
+        private NavigationMeshSingletonComponent navmeshComponent;
+
+        private DynamicBuffer<VertBufferElement> vertBufferElements;
+        private DynamicBuffer<VertWasUpdatedBufferElement> vertWasUpdateBufferElements;
+
+        private DynamicBuffer<NavTriangleBufferElement> triangleBufferElements;
+        private DynamicBuffer<TriangleWasUpdatedBufferElement> triangleWasUpdateBufferElements;
+
+        private Entity navmeshEntity;
+
+        private bool singletonReady;
+
         [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
             state.RequireForUpdate<NavigationMeshSingletonComponent>();
+
+            this.singletonReady = false;
         }
 
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            Entity singletonEntity = SystemAPI.GetSingletonEntity<NavigationMeshSingletonComponent>();
-            NavigationMeshSingletonComponent navmesh = SystemAPI.GetSingleton<NavigationMeshSingletonComponent>();
-
-            if (navmesh.TrianglesWasUpdatedSize > 0)
+            if (!this.singletonReady)
             {
-                DynamicBuffer<VertBufferElement> vertBufferElements =
-                    SystemAPI.GetBuffer<VertBufferElement>(singletonEntity);
-                DynamicBuffer<VertWasUpdatedBufferElement> vertWasUpdateBufferElements =
-                    SystemAPI.GetBuffer<VertWasUpdatedBufferElement>(singletonEntity);
+                if (SystemAPI.TryGetSingletonEntity<NavigationMeshSingletonComponent>(out this.navmeshEntity))
+                {
+                    this.navmeshComponent =
+                        SystemAPI.GetSingleton<NavigationMeshSingletonComponent>();
 
+                    this.vertBufferElements =
+                        SystemAPI.GetBuffer<VertBufferElement>(this.navmeshEntity);
+                    this.vertWasUpdateBufferElements =
+                        SystemAPI.GetBuffer<VertWasUpdatedBufferElement>(this.navmeshEntity);
 
+                    this.triangleBufferElements =
+                        SystemAPI.GetBuffer<NavTriangleBufferElement>(this.navmeshEntity);
+                    this.triangleWasUpdateBufferElements =
+                        SystemAPI.GetBuffer<TriangleWasUpdatedBufferElement>(this.navmeshEntity);
+
+                    this.singletonReady = true;
+                }
+                else
+                    return;
+            }
+
+            if (this.navmeshComponent.VertsWasUpdatedSize > 0)
+            {
                 SetVertWasUpdatedFalseJob setVertWasUpdatedFalseJob =
-                    new SetVertWasUpdatedFalseJob(vertBufferElements, vertWasUpdateBufferElements);
-                state.Dependency = setVertWasUpdatedFalseJob.Schedule(vertWasUpdateBufferElements.Length,
-                    vertWasUpdateBufferElements.Length / SystemInfo.processorCount, state.Dependency);
+                    new SetVertWasUpdatedFalseJob(this.vertBufferElements, this.vertWasUpdateBufferElements);
+                state.Dependency = setVertWasUpdatedFalseJob.Schedule(this.vertWasUpdateBufferElements.Length,
+                    this.vertWasUpdateBufferElements.Length / SystemInfo.processorCount, state.Dependency);
 
-                navmesh.VertsWasUpdatedSize = 0;
+                this.navmeshComponent.VertsWasUpdatedSize = 0;
             }
 
-            if (navmesh.TrianglesWasUpdatedSize > 0)
+            if (this.navmeshComponent.TrianglesWasUpdatedSize > 0)
             {
-                DynamicBuffer<NavTriangleBufferElement> triangleBufferElements =
-                    SystemAPI.GetBuffer<NavTriangleBufferElement>(singletonEntity);
-                DynamicBuffer<TriangleWasUpdatedBufferElement> triangleWasUpdateBufferElements =
-                    SystemAPI.GetBuffer<TriangleWasUpdatedBufferElement>(singletonEntity);
-
                 SetTriangleWasUpdatedFalseJob setTriangleWasUpdatedFalseJob =
-                    new SetTriangleWasUpdatedFalseJob(triangleBufferElements, triangleWasUpdateBufferElements);
-                state.Dependency = setTriangleWasUpdatedFalseJob.Schedule(navmesh.TrianglesWasUpdatedSize,
-                    navmesh.TrianglesWasUpdatedSize / SystemInfo.processorCount, state.Dependency);
+                    new SetTriangleWasUpdatedFalseJob(this.triangleBufferElements,
+                        this.triangleWasUpdateBufferElements);
+                state.Dependency = setTriangleWasUpdatedFalseJob.Schedule(this.navmeshComponent.TrianglesWasUpdatedSize,
+                    this.navmeshComponent.TrianglesWasUpdatedSize / SystemInfo.processorCount, state.Dependency);
 
-                navmesh.TrianglesWasUpdatedSize = 0;
+                this.navmeshComponent.TrianglesWasUpdatedSize = 0;
             }
+
+            state.CompleteDependency();
+            SystemAPI.SetComponent(this.navmeshEntity, this.navmeshComponent);
         }
     }
 

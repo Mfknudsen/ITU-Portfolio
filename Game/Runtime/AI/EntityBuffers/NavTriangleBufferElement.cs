@@ -9,30 +9,30 @@ namespace Runtime.AI.EntityBuffers
 {
     public struct NavTriangleBufferElement : IBufferElementData
     {
-        public int ID;
+        public readonly int ID;
 
-        public int A, B, C;
+        public readonly int A, B, C;
 
         public int NavGroup;
 
-        public float2 Ab, Ac, BC;
+        public float3 AB, AC, BC;
 
-        public int NeighborOneA, NeighborOneB, NeighborTwoA, NeighborTwoB, NeighborThreeA, NeighborThreeB;
+        public readonly int NeighborOneA, NeighborOneB, NeighborTwoA, NeighborTwoB, NeighborThreeA, NeighborThreeB;
 
         public float3 Center;
 
-        public float MaxY, SquaredRadius;
+        public readonly float MaxY, SquaredRadius;
 
-        [MarshalAs(UnmanagedType.U1)] public bool AbEdge, BcEdge, AcEdge;
+        [MarshalAs(UnmanagedType.U1)] public readonly bool ABEdge, BCEdge, ACEdge;
         [MarshalAs(UnmanagedType.U1)] public bool WasUpdated;
 
-        public float NeighborOneWidth2D, NeighborTwoWidth2D, NeighborThreeWidth2D;
+        public readonly float NeighborOneWidth2D, NeighborTwoWidth2D, NeighborThreeWidth2D;
 
-        public int NeighborOneId, NeighborTwoId, NeighborThreeId;
+        public readonly int NeighborOneId, NeighborTwoId, NeighborThreeId;
 
-        public float2 minBound, maxBound;
+        public float2 MinBound, MaxBound;
 
-        public NavTriangleBufferElement(int id, int a, int b, int c, int navGroup, float2 ab, float2 ac, float2 bc,
+        public NavTriangleBufferElement(int id, int a, int b, int c, int navGroup, float3 ab, float3 ac, float3 bc,
             float maxY,
             float neighborOneWidth2D, float neighborTwoWidth2D, float neighborThreeWidth2D, bool abEdge,
             bool bcEdge, bool acEdge, DynamicBuffer<VertBufferElement> verts, int neighborOneId, int neighborTwoId,
@@ -44,13 +44,13 @@ namespace Runtime.AI.EntityBuffers
             this.B = b;
             this.C = c;
             this.NavGroup = navGroup;
-            this.Ab = ab;
-            this.Ac = ac;
+            this.AB = ab;
+            this.AC = ac;
             this.BC = bc;
             this.MaxY = maxY;
-            this.AbEdge = abEdge;
-            this.BcEdge = bcEdge;
-            this.AcEdge = acEdge;
+            this.ABEdge = abEdge;
+            this.BCEdge = bcEdge;
+            this.ACEdge = acEdge;
             this.NeighborOneWidth2D = neighborOneWidth2D;
             this.NeighborTwoWidth2D = neighborTwoWidth2D;
             this.NeighborThreeWidth2D = neighborThreeWidth2D;
@@ -75,10 +75,10 @@ namespace Runtime.AI.EntityBuffers
                         this.Center.QuickSquareDistance(verts[b].Position)),
                     this.Center.QuickSquareDistance(verts[c].Position));
 
-            this.minBound = new float2(
+            this.MinBound = new float2(
                 Mathf.Min(verts[a].Position.x, Mathf.Min(verts[b].Position.x, verts[c].Position.x),
                     Mathf.Min(verts[a].Position.z, Mathf.Min(verts[b].Position.z, verts[c].Position.z))));
-            this.maxBound = new float2(
+            this.MaxBound = new float2(
                 Mathf.Max(verts[a].Position.x, Mathf.Max(verts[b].Position.x, verts[c].Position.x),
                     Mathf.Max(verts[a].Position.z, Mathf.Max(verts[b].Position.z, verts[c].Position.z))));
         }
@@ -88,6 +88,20 @@ namespace Runtime.AI.EntityBuffers
             reuseArray[0] = this.A;
             reuseArray[1] = this.B;
             reuseArray[2] = this.C;
+        }
+
+        public readonly int EdgeCount()
+        {
+            int result = 0;
+
+            if (this.ABEdge)
+                result++;
+            if (this.BCEdge)
+                result++;
+            if (this.ACEdge)
+                result++;
+
+            return result;
         }
     }
 }

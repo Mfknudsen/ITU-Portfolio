@@ -8,6 +8,7 @@ using UnityEditor;
 
 namespace Editor
 {
+#if UNITY_EDITOR
     [CustomEditor(typeof(BookButton))]
     public class EditorBookButton : UnityEditor.Editor
     {
@@ -17,7 +18,7 @@ namespace Editor
 
             if (bookButton != null)
             {
-                BookTurn turn = (BookTurn) EditorGUILayout.EnumPopup("Book Turn Enums", bookButton.GetBookTurn());
+                BookTurn turn = (BookTurn)EditorGUILayout.EnumPopup("Book Turn Enums", bookButton.GetBookTurn());
                 if (turn != bookButton.GetBookTurn())
                 {
                     bookButton.SetBookTurn(turn);
@@ -30,4 +31,5 @@ namespace Editor
             base.OnInspectorGUI();
         }
     }
+#endif
 }

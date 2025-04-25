@@ -2,6 +2,7 @@
 
 using System.Collections.Generic;
 using UnityEditor;
+using UnityEngine;
 using UnityEngine.LowLevel;
 using UnityEngine.PlayerLoop;
 
@@ -48,11 +49,12 @@ namespace Runtime.Core
 
         #region Internal
 
-#if !UNITY_INCLUDE_TESTS
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSplashScreen)]
-#endif
         private static void Initialize()
         {
+#if !UNITY_INCLUDE_TESTS
+            return;
+#endif
             PlayerLoopSystem playerLoop = PlayerLoop.GetCurrentPlayerLoop();
             for (int i = 0; i < playerLoop.subSystemList.Length; i++)
             {

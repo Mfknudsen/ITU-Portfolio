@@ -17,10 +17,16 @@ namespace Runtime.Pokémon.Pokédex
         #region Values
 
 #if UNITY_EDITOR
-        [SerializeField, ValueDropdown(nameof(PokemonOptions), FlattenTreeView = true), OnValueChanged(nameof(OnPokemonOptionChanged))] private string pokemonName = "Grottle";
+        [SerializeField]
+        [ValueDropdown(nameof(PokemonOptions), FlattenTreeView = true)]
+        [OnValueChanged(nameof(OnPokemonOptionChanged))]
+        private string pokemonName = "Grottle";
 
-        private IEnumerable<string> PokemonOptions() =>
-            new DirectoryInfo(Application.dataPath + "/ScriptableObjects/Pokedex/").GetFiles().Select(f => f.Name).Where(s => !s.Contains(".meta"));
+        private IEnumerable<string> PokemonOptions()
+        {
+            return new DirectoryInfo(Application.dataPath + "/ScriptableObjects/Pokedex/").GetFiles()
+                .Select(f => f.Name).Where(s => !s.Contains(".meta"));
+        }
 
         private void OnPokemonOptionChanged()
         {
@@ -35,13 +41,15 @@ namespace Runtime.Pokémon.Pokédex
         }
 #endif
 
-        [SerializeField, HideInInspector] private string path = "Assets/ScriptableObjects/Pokedex/Grottle.asset";
+        [SerializeField] [HideInInspector] private string path = "Assets/ScriptableObjects/Pokedex/Grottle.asset";
 
         #endregion
 
-        #region Out 
+        #region Out
 
+#if UNITY_EDITOR
         public Pokemon Get => Pokedex.Get(this.path);
+#endif
 
         #endregion
     }

@@ -1,6 +1,7 @@
 using System;
 using Runtime.AI.EntityBuffers;
 using Unity.Collections;
+using Unity.Entities;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -84,6 +85,21 @@ namespace Runtime.AI.EntitySystems
 
         public static int GetTriangleIdsByPosition(
             ref NativeList<TriangleFlattenIndexBufferElement> reuseArray,
+            float3 pos,
+            int cellXLength, int cellZLength,
+            float minFloorX, float minFloorZ, float groupDivision,
+            DynamicBuffer<TriangleFlattenIndexBufferElement> triangleIndexes,
+            DynamicBuffer<TriangleFlattenBufferElement> triangleArraySizes)
+        {
+            int2 id = GroupingIDByPosition(pos, minFloorX, minFloorZ, cellXLength, cellZLength, groupDivision);
+
+            return GetTriangleIndexByXZ(ref reuseArray, id.x, id.y, cellXLength, triangleIndexes,
+                triangleArraySizes);
+        }
+
+
+        public static int GetTriangleIdsByPosition(
+            ref NativeList<TriangleFlattenIndexBufferElement> reuseArray,
             float x, float z,
             int cellXLength, int cellZLength,
             float minFloorX, float minFloorZ, float groupDivision,
@@ -129,6 +145,28 @@ namespace Runtime.AI.EntitySystems
             int cellXLength,
             NativeArray<TriangleFlattenIndexBufferElement> triangleIndexes,
             NativeArray<TriangleFlattenBufferElement> triangleArraySizes)
+        {
+            int arrayPosition2D = x * cellXLength + z;
+            int size = triangleArraySizes[arrayPosition2D].Size;
+            int startPositionInArray3D = triangleArraySizes[arrayPosition2D].StartIndex;
+
+            for (int i = 0; i < size; i++)
+            {
+                if (i < reuseArray.Length)
+                    reuseArray[i] = triangleIndexes[startPositionInArray3D + i];
+                else
+                    reuseArray.Add(triangleIndexes[startPositionInArray3D + i]);
+            }
+
+            return size;
+        }
+
+        private static int GetTriangleIndexByXZ(
+            ref NativeList<TriangleFlattenIndexBufferElement> reuseArray,
+            int x, int z,
+            int cellXLength,
+            DynamicBuffer<TriangleFlattenIndexBufferElement> triangleIndexes,
+            DynamicBuffer<TriangleFlattenBufferElement> triangleArraySizes)
         {
             int arrayPosition2D = x * cellXLength + z;
             int size = triangleArraySizes[arrayPosition2D].Size;

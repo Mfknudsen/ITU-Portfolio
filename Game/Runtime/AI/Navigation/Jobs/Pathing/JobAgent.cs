@@ -22,7 +22,7 @@ namespace Runtime.AI.Navigation.Jobs.Pathing
 
         public JobAgent(QueuedAgentRequest request)
         {
-            UnitAgent agent = request.Agent;
+            NavigationAgent agent = request.Agent;
             UnitAgentSettings settings = agent.Settings;
 
             this.currentTriangleID = agent.CurrentTriangleIndex();

@@ -73,7 +73,7 @@ namespace Runtime.AI.EntitySystems
                 Debug.DrawRay(p + xDir + zDir, -xDir);
                 Debug.DrawRay(p + xDir + zDir, -zDir);
 
-                int size = aspect.CellComponent.ValueRO.Size;
+                int size = aspect.CellComponent.ValueRO.TriangleSize;
                 DynamicBuffer<NavMeshCellTriangleIndexBufferElement> triangleIds = aspect.NavTriangleBufferElements;
 
                 for (int j = 0; j < size; j++)

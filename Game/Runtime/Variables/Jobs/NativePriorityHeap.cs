@@ -2,6 +2,7 @@
 // Check that repo and ask for permission before using it in other projects
 
 using System;
+using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 
@@ -16,6 +17,7 @@ namespace Runtime.Variables.Jobs
 
     [NativeContainerSupportsDeallocateOnJobCompletion]
     [NativeContainer]
+    [BurstCompile]
     public unsafe struct NativePriorityHeap<T> : IDisposable where T : unmanaged, IComparable<T>
     {
         [NativeDisableUnsafePtrRestriction] private T* mBuffer;

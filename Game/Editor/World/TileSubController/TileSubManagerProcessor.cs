@@ -12,12 +12,16 @@ using Runtime.Editor;
 using Runtime.World;
 using Runtime.World.Overworld;
 using Runtime.World.Overworld.TileHierarchy;
+#if UNITY_EDITOR
 using Sirenix.OdinInspector;
 using Sirenix.OdinInspector.Editor;
+#endif
 using Unity.AI.Navigation;
+#if UNITY_EDITOR
 using Unity.EditorCoroutines.Editor;
 using UnityEditor;
 using UnityEditor.SceneManagement;
+#endif
 using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.SceneManagement;
@@ -28,6 +32,7 @@ using TileController = Runtime.World.Overworld.TileSubController;
 
 namespace Editor.World.TileSubController
 {
+#if UNITY_EDITOR
     public sealed class TileSubControllerProcessor : OdinPropertyProcessor<TileController>
     {
         #region Values
@@ -1224,4 +1229,5 @@ namespace Editor.World.TileSubController
 
         #endregion
     }
+#endif
 }

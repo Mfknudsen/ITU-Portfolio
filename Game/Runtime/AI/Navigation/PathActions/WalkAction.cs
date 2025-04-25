@@ -40,7 +40,7 @@ namespace Runtime.AI.Navigation.PathActions
 
         #region In
 
-        public override bool CheckAction(UnitPath path, UnitAgent agent)
+        public override bool CheckAction(UnitPath path, NavigationAgent agent)
         {
             Vector2 agentPosition = agent.transform.position.XZ(),
                 destinationXZ = this.destination.XZ();

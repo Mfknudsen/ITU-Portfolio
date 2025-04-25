@@ -1,11 +1,11 @@
 #region Libraries
 
-using Runtime.AI;
-using Runtime.Pokémon;
-using Sirenix.OdinInspector;
 using System.Collections.Generic;
 using System.Linq;
+using Runtime.AI;
 using Runtime.Core;
+using Runtime.Pokémon;
+using Sirenix.OdinInspector;
 using UnityEngine;
 
 #endregion
@@ -16,7 +16,7 @@ namespace Runtime.World.Overworld.Spawner
     {
         #region Values
 
-        [SerializeField, Required] private PokemonSpawnList spawnList;
+        [SerializeField] [Required] private PokemonSpawnList spawnList;
 
         [SerializeField] private SpawnLocation[] spawnLocations;
 
@@ -47,7 +47,10 @@ namespace Runtime.World.Overworld.Spawner
             base.OnEnable();
         }
 
-        private void OnDisable() => this.checkStateTimer?.Stop();
+        private void OnDisable()
+        {
+            this.checkStateTimer?.Stop();
+        }
 
         #endregion
 
@@ -79,10 +82,13 @@ namespace Runtime.World.Overworld.Spawner
             this.checkStateTimer = new Timer(Random.Range(this.spawnInterval - 1f, this.spawnInterval + 1f),
                 this.CheckState);
         }
-        
+
         private void SpawnOverWorldPokemon()
         {
             Pokemon toSpawn = this.spawnList.GetPokemonPrefab();
+
+            if (toSpawn == null)
+                return;
 
             SpawnLocation[] allowedFrom = this.spawnLocations.Where(l => l.Allowed(toSpawn)).ToArray();
 
@@ -101,8 +107,10 @@ namespace Runtime.World.Overworld.Spawner
         }
 
 #if UNITY_EDITOR
-        protected override string SpawnListName() =>
-            this.spawnList != null ? this.spawnList.name : "";
+        protected override string SpawnListName()
+        {
+            return this.spawnList != null ? this.spawnList.name : "";
+        }
 #endif
 
         #endregion

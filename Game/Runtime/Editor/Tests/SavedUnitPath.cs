@@ -9,6 +9,7 @@ using UnityEngine;
 
 namespace Runtime.Editor.Tests
 {
+#if UNITY_EDITOR
     public sealed class SavedUnitPath : SerializedScriptableObject
     {
         #region Values
@@ -21,11 +22,20 @@ namespace Runtime.Editor.Tests
 
         #region Getters
 
-        public List<Vector3> GetPathPoints() => this.pathPoints;
+        public List<Vector3> GetPathPoints()
+        {
+            return this.pathPoints;
+        }
 
-        public Vector3 GetStart() => this.start;
+        public Vector3 GetStart()
+        {
+            return this.start;
+        }
 
-        public Vector3 GetEnd() => this.end;
+        public Vector3 GetEnd()
+        {
+            return this.end;
+        }
 
         #endregion
 
@@ -46,4 +56,5 @@ namespace Runtime.Editor.Tests
 
         #endregion
     }
+#endif
 }

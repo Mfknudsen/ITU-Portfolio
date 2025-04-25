@@ -1,3 +1,4 @@
+using System;
 using Runtime.AI.EntityBuffers;
 using Runtime.AI.EntityComponents;
 using Runtime.Core;
@@ -14,59 +15,66 @@ namespace Runtime.AI.EntitySystems
     [BurstCompile]
     internal partial struct DestinationInTriangleSystem : ISystem
     {
+        private EntityQuery entityQuery;
+
+        private ComponentLookup<DestinationComponent> destinationLookup;
+
         [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
             state.RequireForUpdate<NavigationMeshSingletonComponent>();
             state.RequireForUpdate<NavigationMeshSingletonComponent>();
+
+            this.entityQuery = state.GetEntityQuery(ComponentType.ReadOnly<UnitAgentComponent>());
+
+            this.destinationLookup = state.GetComponentLookup<DestinationComponent>();
         }
 
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            Entity navmeshEntity = SystemAPI.GetSingletonEntity<NavigationMeshSingletonComponent>();
+            if (!SystemAPI.TryGetSingletonEntity<NavigationMeshSingletonComponent>(out Entity navmeshEntity))
+                return;
 
             NavigationMeshSingletonComponent navmeshSingletonComponent =
                 SystemAPI.GetSingleton<NavigationMeshSingletonComponent>();
-
             DynamicBuffer<TriangleFlattenBufferElement> sizeBufferElements =
                 SystemAPI.GetBuffer<TriangleFlattenBufferElement>(navmeshEntity);
-
-            if (sizeBufferElements.Length == 0)
-                return;
-
             DynamicBuffer<TriangleFlattenIndexBufferElement> triangleIndexBufferElements =
                 SystemAPI.GetBuffer<TriangleFlattenIndexBufferElement>(navmeshEntity);
-
             DynamicBuffer<VertBufferElement> verts =
                 SystemAPI.GetBuffer<VertBufferElement>(navmeshEntity);
             DynamicBuffer<NavTriangleBufferElement> triangles =
                 SystemAPI.GetBuffer<NavTriangleBufferElement>(navmeshEntity);
 
-            NativeList<Entity> entities = state.GetEntityQuery(ComponentType.ReadOnly<UnitAgentComponent>())
-                .ToEntityListAsync(Allocator.TempJob, state.Dependency, out JobHandle handle);
-            handle.Complete();
+            if (sizeBufferElements.Length == 0)
+                return;
+
+            this.destinationLookup.Update(ref state);
+
+            NativeArray<Entity> entities = this.entityQuery.ToEntityArray(Allocator.TempJob);
+
+            if (entities.Length == 0)
+            {
+                state.Dependency = entities.Dispose(state.Dependency);
+                return;
+            }
+
+            int batch = math.max(entities.Length / SystemInfo.processorCount, 1);
 
             DestinationInTriangleJob destinationInTriangleJob = new DestinationInTriangleJob(
-                entities,
-                navmeshSingletonComponent.GroupDivision,
-                navmeshSingletonComponent.MinFloorX,
-                navmeshSingletonComponent.MinFloorZ,
-                navmeshSingletonComponent.CellXLength,
-                navmeshSingletonComponent.CellZLength,
-                verts, triangles,
-                sizeBufferElements, triangleIndexBufferElements,
-                state.GetComponentLookup<DestinationComponent>());
-            state.Dependency = destinationInTriangleJob.Schedule(entities, entities.Length / SystemInfo.processorCount,
-                state.Dependency);
-
-            state.CompleteDependency();
-            entities.Dispose();
+                entities, navmeshSingletonComponent.GroupDivision, navmeshSingletonComponent.MinFloorX,
+                navmeshSingletonComponent.MinFloorZ, navmeshSingletonComponent.CellXLength,
+                navmeshSingletonComponent.CellZLength, verts, triangles, sizeBufferElements,
+                triangleIndexBufferElements,
+                this.destinationLookup);
+            JobHandle handle = destinationInTriangleJob.ScheduleParallel(entities.Length, batch, state.Dependency);
+            state.Dependency = entities.Dispose(handle);
         }
     }
 
     [BurstCompile]
-    internal struct DestinationInTriangleJob : IJobParallelForDefer
+    internal struct DestinationInTriangleJob : IJobFor, IDisposable
     {
         [ReadOnly] private readonly float groupDivision;
 
@@ -84,12 +92,12 @@ namespace Runtime.AI.EntitySystems
         private readonly NativeArray<TriangleFlattenIndexBufferElement> triangleIndexes;
 
         [NativeDisableParallelForRestriction] [ReadOnly]
-        private NativeList<Entity> entities;
+        private NativeArray<Entity> entities;
 
         [NativeDisableParallelForRestriction] private ComponentLookup<DestinationComponent> destinationLookup;
 
         public DestinationInTriangleJob(
-            NativeList<Entity> entities,
+            NativeArray<Entity> entities,
             float groupDivision, float minFloorX, float minFloorZ, int cellXLength, int cellZLength,
             DynamicBuffer<VertBufferElement> simpleVerts,
             DynamicBuffer<NavTriangleBufferElement> triangles,
@@ -121,6 +129,10 @@ namespace Runtime.AI.EntitySystems
         {
             Entity entity = this.entities[index];
             DestinationComponent destination = this.destinationLookup[entity];
+
+            if (!(destination.TriangleID == -1 || destination.PositionWasUpdated))
+                return;
+
             float3 position = destination.Point;
             float2 position2D = position.xz;
 
@@ -141,8 +153,8 @@ namespace Runtime.AI.EntitySystems
             {
                 NavTriangleBufferElement t = this.triangles[i.Index];
 
-                if (t.minBound.x > position2D.x || t.minBound.y > position2D.y ||
-                    t.maxBound.x < position2D.x || t.maxBound.y < position2D.y)
+                if (t.MinBound.x > position2D.x || t.MinBound.y > position2D.y ||
+                    t.MaxBound.x < position2D.x || t.MaxBound.y < position2D.y)
                     continue;
 
                 if (!MathC.PointWithinTriangle2D(position2D, this.verts[t.A].XZ(),
@@ -151,12 +163,14 @@ namespace Runtime.AI.EntitySystems
                     continue;
 
                 destination.TriangleID = i.Index;
+                this.destinationLookup[entity] = destination;
                 return;
             }
 
             if (triangleIds.Length == 0)
             {
                 destination.TriangleID = -1;
+                this.destinationLookup[entity] = destination;
                 return;
             }
 
@@ -176,6 +190,12 @@ namespace Runtime.AI.EntitySystems
             }
 
             destination.TriangleID = closestID;
+            this.destinationLookup[entity] = destination;
+        }
+
+        public void Dispose()
+        {
+            this.entities.Dispose();
         }
     }
 }

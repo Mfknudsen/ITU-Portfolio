@@ -6,6 +6,7 @@ using UnityEditor;
 
 namespace Editor.Systems
 {
+#if UNITY_EDITOR
     [InitializeOnLoad]
     public static class BakedEditorManager
     {
@@ -29,4 +30,5 @@ namespace Editor.Systems
 
         #endregion
     }
+#endif
 }

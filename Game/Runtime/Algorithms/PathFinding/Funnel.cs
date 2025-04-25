@@ -28,7 +28,7 @@ namespace Runtime.Algorithms.PathFinding
         /// <param name="agent">The agent that requested the path</param>
         /// <returns></returns>
         public static List<Vector3> GetPath(Vector3 start, Vector3 end, int[] triangleIDs, NavTriangle[] triangles,
-            Vector3[] verts, UnitAgent agent)
+            Vector3[] verts, NavigationAgent agent)
         {
             //Result list containing the different position for the agent to travel along.
             List<Vector3> result = new List<Vector3>(triangles.Length);

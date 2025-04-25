@@ -1,6 +1,8 @@
 #region Libraries
 
+#if UNITY_EDITOR
 using Sirenix.OdinInspector.Editor;
+#endif
 using UnityEditor;
 using UnityEngine;
 
@@ -8,6 +10,7 @@ using UnityEngine;
 
 namespace Editor.World.TileSubController
 {
+#if UNITY_EDITOR
     [CustomEditor(typeof(Runtime.World.Overworld.TileSubController))]
     public sealed class TileSubControllerEditor : OdinEditor
     {
@@ -35,4 +38,5 @@ namespace Editor.World.TileSubController
 
         #endregion
     }
+#endif
 }

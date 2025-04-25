@@ -192,10 +192,8 @@ namespace Runtime.World.Overworld.Spawner
     {
         #region Values
 
-#if UNITY_EDITOR
         [SerializeField] private List<Vector3> storedPoints;
         [SerializeField] private List<Vector3Int> storedTriangles;
-#endif
 
         #endregion
 

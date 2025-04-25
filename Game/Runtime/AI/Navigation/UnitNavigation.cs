@@ -8,17 +8,17 @@ using Runtime.AI.EntityComponents;
 using Runtime.AI.Navigation.Jobs.Pathing;
 using Runtime.AI.Navigation.RayCast;
 using Runtime.Core;
+using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
-using Unity.Transforms;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.LowLevel;
 using UnityEngine.PlayerLoop;
-using NavMeshCellComponent = Runtime.AI.EntityComponents.NavMeshCellComponent;
+using UnityEngine.Profiling;
 
 #endregion
 
@@ -41,7 +41,7 @@ namespace Runtime.AI.Navigation
         /// <summary>
         ///     All currently active agents
         /// </summary>
-        private static List<UnitAgent> allUnitAgents;
+        private static List<NavigationAgent> allUnitAgents;
 
         private static List<UnitWalkGroup> allWalkGroups;
 
@@ -105,6 +105,7 @@ namespace Runtime.AI.Navigation
             if (set == null || navMesh == set)
                 return;
 
+
             navMesh = set;
 
             ResetGrouping();
@@ -115,7 +116,9 @@ namespace Runtime.AI.Navigation
 
             EntityManager entityManager = Unity.Entities.World.DefaultGameObjectInjectionWorld.EntityManager;
             EntityQuery query = entityManager.CreateEntityQuery(typeof(NavigationMeshSingletonComponent));
+
             Entity singletonEntity;
+
             if (!query.TryGetSingleton(out NavigationMeshSingletonComponent component))
             {
                 singletonEntity = entityManager.CreateSingleton<NavigationMeshSingletonComponent>(
@@ -133,9 +136,11 @@ namespace Runtime.AI.Navigation
                 entityManager.AddBuffer<VertInTrianglesFlattenIndexBufferElement>(singletonEntity);
                 entityManager.AddBuffer<VertInTrianglesFlattenBufferElement>(singletonEntity);
 
-
                 entityManager.AddBuffer<VertWasUpdatedBufferElement>(singletonEntity);
                 entityManager.AddBuffer<TriangleWasUpdatedBufferElement>(singletonEntity);
+
+                entityManager.AddBuffer<AgentPathCollisionBufferElement>(singletonEntity);
+                entityManager.AddBuffer<EdgeCollisionBufferElement>(singletonEntity);
             }
             else
                 singletonEntity = query.GetSingletonEntity();
@@ -189,7 +194,8 @@ namespace Runtime.AI.Navigation
                         sharedThree));
             }
 
-            DynamicBuffer<AreaBufferElement> areaType = entityManager.GetBuffer<AreaBufferElement>(singletonEntity);
+            DynamicBuffer<AreaBufferElement> areaType =
+                entityManager.GetBuffer<AreaBufferElement>(singletonEntity);
             foreach (int area in set.Areas)
                 areaType.Add(new AreaBufferElement { AreaType = area });
 
@@ -221,6 +227,8 @@ namespace Runtime.AI.Navigation
                     entityManager.SetComponentData(cellEntity, navMeshCellComponent);
 
                     entityManager.AddBuffer<NavMeshCellVertIndexBufferElement>(cellEntity);
+                    entityManager.AddBuffer<CellAgentCollisionIndexBufferElement>(cellEntity);
+                    entityManager.AddBuffer<CellEdgeCollisionBufferElement>(cellEntity);
 
                     DynamicBuffer<NavMeshCellTriangleIndexBufferElement> navMeshCellTriangleIndexBufferElement =
                         entityManager.AddBuffer<NavMeshCellTriangleIndexBufferElement>(cellEntity);
@@ -236,7 +244,7 @@ namespace Runtime.AI.Navigation
 
         #region In
 
-        internal static Entity AddAgent(UnitAgent agent)
+        internal static Entity AddAgent(NavigationAgent agent)
         {
             allUnitAgents.Add(agent);
 
@@ -250,6 +258,8 @@ namespace Runtime.AI.Navigation
             UnitAgentComponent agentComponent = entityManager.GetComponentData<UnitAgentComponent>(entity);
             agentComponent.ID = agent.GetID();
             agentComponent.CurrentTriangleID = -1;
+            agentComponent.Position = agent.transform.position;
+            agentComponent.Rotation = agent.transform.rotation;
             entityManager.SetComponentData(entity, agentComponent);
 
             entityManager.AddComponent<DestinationComponent>(entity);
@@ -259,15 +269,10 @@ namespace Runtime.AI.Navigation
             AgentSettingsComponent agentSettingsComponent =
                 entityManager.GetComponentData<AgentSettingsComponent>(entity);
             agentSettingsComponent.Radius = agent.Settings.Radius;
+            agentSettingsComponent.Height = agent.Settings.Height;
             agentSettingsComponent.ID = agent.Settings.ID;
+            agentSettingsComponent.MoveSpeed = agent.Settings.MoveSpeed;
             entityManager.SetComponentData(entity, agentSettingsComponent);
-
-            entityManager.AddComponent<LocalTransform>(entity);
-            LocalTransform localTransform = entityManager.GetComponentData<LocalTransform>(entity);
-            localTransform.Position = agent.transform.position;
-            localTransform.Rotation = agent.transform.rotation;
-            localTransform.Scale = 1;
-            entityManager.SetComponentData(entity, localTransform);
 
             entityManager.AddBuffer<WayPointBufferElement>(entity);
             entityManager.AddBuffer<AgentTrianglePathBufferElement>(entity);
@@ -275,7 +280,7 @@ namespace Runtime.AI.Navigation
             return entity;
         }
 
-        internal static void RemoveAgent(UnitAgent agent, Entity? entity)
+        internal static void RemoveAgent(NavigationAgent agent, Entity? entity)
         {
             if (agent == null || !allUnitAgents.Contains(agent))
                 return;
@@ -286,8 +291,16 @@ namespace Runtime.AI.Navigation
 
             EntityManager entityManager = Unity.Entities.World.DefaultGameObjectInjectionWorld.EntityManager;
 
-            if (entity.HasValue)
-                entityManager.DestroyEntity(entity.Value);
+            if (!entity.HasValue) return;
+
+            for (int i = agent.GetID(); i < allUnitAgents.Count; i++)
+            {
+                NavigationAgent t = allUnitAgents[i];
+                t.SetID(t.GetID() - 1);
+                allUnitAgents[i] = t;
+            }
+
+            entityManager.DestroyEntity(entity.Value);
         }
 
         public static void AddOnNavMeshChange(UnityAction action)
@@ -300,12 +313,12 @@ namespace Runtime.AI.Navigation
             onNavMeshChanged -= action;
         }
 
-        public static void QueueForPath(UnitAgent agent, Vector3 destination)
+        public static void QueueForPath(NavigationAgent agent, Vector3 destination)
         {
             requests.Add(new QueuedAgentRequest(destination, agent));
         }
 
-        public static int PlaceAgentOnNavMesh(UnitAgent agent)
+        public static int PlaceAgentOnNavMesh(NavigationAgent agent)
         {
             Vector3 agentPosition = agent.transform.position;
             Vector2 agentPosition2D = agentPosition.XZ();
@@ -436,11 +449,11 @@ namespace Runtime.AI.Navigation
         /// </summary>
         /// <param name="agent">Will get agents around this agent while also not including it in the result</param>
         /// <returns>Agents around input agent</returns>
-        public static List<UnitAgent> GetAgentsByAgentPosition(UnitAgent agent)
+        public static List<NavigationAgent> GetAgentsByAgentPosition(NavigationAgent agent)
         {
             Vector2Int id = GroupingIDByPosition(agent.transform.position);
 
-            List<UnitAgent> result = new List<UnitAgent>();
+            List<NavigationAgent> result = new List<NavigationAgent>();
 
             for (int x = -1; x <= 1; x++)
             {
@@ -534,17 +547,17 @@ namespace Runtime.AI.Navigation
             return result;
         }
 
-        public static bool AgentWithinTriangle(UnitAgent agent)
+        public static bool AgentWithinTriangle(NavigationAgent agent)
         {
             return false;
         }
 
-        public static bool AgentWithinTriangle(UnitAgent agent, Vector3 point)
+        public static bool AgentWithinTriangle(NavigationAgent agent, Vector3 point)
         {
             return false;
         }
 
-        public static List<NavigationRayCastObject> GetRayCastObjects(UnitAgent currentAgent, Vector2 direction,
+        public static List<NavigationRayCastObject> GetRayCastObjects(NavigationAgent currentAgent, Vector2 direction,
             float radius)
         {
             List<NavigationRayCastObject> result = new List<NavigationRayCastObject>();
@@ -586,7 +599,7 @@ namespace Runtime.AI.Navigation
 
             foreach (int agentID in agentIDs)
             {
-                UnitAgent otherAgent = allUnitAgents[agentID];
+                NavigationAgent otherAgent = allUnitAgents[agentID];
                 Vector2 otherAgentPosition = otherAgent.transform.position.XZ();
 
                 if (Vector2.Angle(direction, otherAgentPosition - currentAgentPosition) >
@@ -666,6 +679,12 @@ namespace Runtime.AI.Navigation
             PlayerLoopSystem playerLoop = PlayerLoop.GetCurrentPlayerLoop();
             for (int i = 0; i < playerLoop.subSystemList.Length; i++)
             {
+                if (playerLoop.subSystemList[i].type == typeof(PreUpdate))
+                    playerLoop.subSystemList[i].updateDelegate += UpdateAgentPositionsInEcs;
+
+                if (playerLoop.subSystemList[i].type == typeof(PostLateUpdate))
+                    playerLoop.subSystemList[i].updateDelegate += UpdateAgentPositionsFromEcs;
+
                 if (playerLoop.subSystemList[i].type == typeof(FixedUpdate))
                     playerLoop.subSystemList[i].updateDelegate += UpdateAgents;
 
@@ -676,7 +695,7 @@ namespace Runtime.AI.Navigation
             PlayerLoop.SetPlayerLoop(playerLoop);
 
             requests = new List<QueuedAgentRequest>();
-            allUnitAgents = new List<UnitAgent>();
+            allUnitAgents = new List<NavigationAgent>();
             allWalkGroups = new List<UnitWalkGroup>();
 
             unitAgentLayer = LayerMask.NameToLayer("AI");
@@ -701,7 +720,7 @@ namespace Runtime.AI.Navigation
 
         private static void ResetState()
         {
-            foreach (UnitAgent agent in allUnitAgents)
+            foreach (NavigationAgent agent in allUnitAgents)
                 agent.SetGroupID(-1);
             allUnitAgents.Clear();
             allWalkGroups.Clear();
@@ -712,8 +731,15 @@ namespace Runtime.AI.Navigation
             navMesh = null;
 
             PlayerLoopSystem playerLoop = PlayerLoop.GetCurrentPlayerLoop();
+
             for (int i = 0; i < playerLoop.subSystemList.Length; i++)
             {
+                if (playerLoop.subSystemList[i].type == typeof(PreUpdate))
+                    playerLoop.subSystemList[i].updateDelegate -= UpdateAgentPositionsInEcs;
+
+                if (playerLoop.subSystemList[i].type == typeof(PostLateUpdate))
+                    playerLoop.subSystemList[i].updateDelegate -= UpdateAgentPositionsFromEcs;
+
                 if (playerLoop.subSystemList[i].type == typeof(FixedUpdate))
                     playerLoop.subSystemList[i].updateDelegate -= UpdateAgents;
 
@@ -724,6 +750,30 @@ namespace Runtime.AI.Navigation
             PlayerLoop.SetPlayerLoop(playerLoop);
         }
 #endif
+
+        private static void UpdateAgentPositionsFromEcs()
+        {
+            Profiler.BeginSample("UpdateAgentFromECS");
+
+            EntityManager entityManager = Unity.Entities.World.DefaultGameObjectInjectionWorld.EntityManager;
+
+            foreach (NavigationAgent allUnitAgent in allUnitAgents)
+                allUnitAgent.UpdatePositionFromEcs(entityManager);
+
+            Profiler.EndSample();
+        }
+
+        [BurstCompile]
+        private static void UpdateAgentPositionsInEcs()
+        {
+            Profiler.BeginSample("UpdateECSFromAgent");
+
+            EntityManager entityManager = Unity.Entities.World.DefaultGameObjectInjectionWorld.EntityManager;
+
+            foreach (NavigationAgent allUnitAgent in allUnitAgents)
+                allUnitAgent.UpdatePositionInEcs(entityManager);
+            Profiler.EndSample();
+        }
 
         /// <summary>
         ///     Update all currently active agents.
@@ -736,15 +786,15 @@ namespace Runtime.AI.Navigation
             if (navMesh == null)
                 return;
 
-            foreach (UnitAgent unitAgent in allUnitAgents)
+            foreach (NavigationAgent unitAgent in allUnitAgents)
                 unitAgent.UpdateInTriangle();
 
-            foreach (UnitAgent unitAgent in allUnitAgents)
+            foreach (NavigationAgent unitAgent in allUnitAgents)
                 unitAgent.UpdateIntendedDirection();
 
             UpdateAgentWalkGroups();
 
-            foreach (UnitAgent unitAgent in allUnitAgents)
+            foreach (NavigationAgent unitAgent in allUnitAgents)
                 unitAgent.UpdateAgent();
         }
 
@@ -873,7 +923,7 @@ namespace Runtime.AI.Navigation
                 navMeshCells[x, y] = new NavMeshCell(triangleIDs);
             }
 
-            foreach (UnitAgent agent in allUnitAgents)
+            foreach (NavigationAgent agent in allUnitAgents)
                 AddUnitToCell(agent);
         }
 
@@ -951,7 +1001,7 @@ namespace Runtime.AI.Navigation
 
                 for (int i = 0; i < agentIDs.Count; i++)
                 {
-                    UnitAgent current = allUnitAgents[agentIDs[i]];
+                    NavigationAgent current = allUnitAgents[agentIDs[i]];
 
                     if (current.GetGroupID() != -1)
                     {
@@ -972,7 +1022,7 @@ namespace Runtime.AI.Navigation
 
                     for (int j = i + 1; j < agentIDs.Count; j++)
                     {
-                        UnitAgent other = allUnitAgents[agentIDs[j]];
+                        NavigationAgent other = allUnitAgents[agentIDs[j]];
 
                         if (other.GetCurrentNavMeshDirection() == Vector2.zero)
                             continue;
@@ -1053,7 +1103,7 @@ namespace Runtime.AI.Navigation
             }
         }
 
-        private static UnitPath ToUnitPath(JobAgent jobAgent, JobPath jobPath, UnitAgent agent)
+        private static UnitPath ToUnitPath(JobAgent jobAgent, JobPath jobPath, NavigationAgent agent)
         {
             int[] ids = new int[jobPath.nodePath.Length];
             for (int i = 0; i < jobPath.nodePath.Length; i++)
@@ -1082,13 +1132,13 @@ namespace Runtime.AI.Navigation
                     navMeshCells.GetLength(1) - 1)));
         }
 
-        private static void AddUnitToCell(UnitAgent agent)
+        private static void AddUnitToCell(NavigationAgent agent)
         {
             Vector2Int id = GroupingIDByPosition(agent.transform.position);
             navMeshCells[id.x, id.y].AddAgentID(agent.GetID());
         }
 
-        private static void RemoveUnitFromCell(UnitAgent agent)
+        private static void RemoveUnitFromCell(NavigationAgent agent)
         {
             Vector2Int id = GroupingIDByPosition(agent.transform.position);
             navMeshCells[id.x, id.y].RemoveAgentID(agent.GetID());
@@ -1164,7 +1214,7 @@ namespace Runtime.AI.Navigation
             Initialize();
         }
 
-        public static IReadOnlyList<UnitAgent> GetAllAgents()
+        public static IReadOnlyList<NavigationAgent> GetAllAgents()
         {
             return allUnitAgents;
         }

@@ -2,7 +2,9 @@
 
 using System.Collections.Generic;
 using Runtime.World.Overworld.Spawner;
+#if UNITY_EDITOR
 using Sirenix.OdinInspector.Editor;
+#endif
 using UnityEditor;
 using UnityEngine;
 
@@ -10,16 +12,17 @@ using UnityEngine;
 
 namespace Editor.World.Spawner
 {
+#if UNITY_EDITOR
     [CustomEditor(typeof(SpawnLocation))]
     public sealed class SpawnerEditor : OdinEditor
     {
         #region Values
 
-        private static readonly float handleSize = 2, aboveFloorDistance = 1.5f;
+        private const float HandleSize = 2, AboveFloorDistance = 1.5f;
 
         private static bool moveState = true;
 
-        private readonly List<int> selectedIDs = new();
+        private readonly List<int> selectedIDs = new List<int>();
 
         #endregion
 
@@ -42,7 +45,7 @@ namespace Editor.World.Spawner
             if (spawnLocation.IsAreaSpawnType)
             {
                 if (GUILayout.Button("Lower Area Points to ground level"))
-                    this.LowerAreaPointsToGround(spawnLocation);
+                    LowerAreaPointsToGround(spawnLocation);
 
                 if (GUILayout.Button("Clean unused Area Points"))
                     this.CleanUpUnusedAreaPoints(spawnLocation);
@@ -59,8 +62,8 @@ namespace Editor.World.Spawner
                     SceneView.RepaintAll();
                 }
                 else if (GUILayout.Button("Remove selected point")
-                    && this.selectedIDs.Count == 1
-                    && spawnLocation.GetAreaPoints.Length > 3)
+                         && this.selectedIDs.Count == 1
+                         && spawnLocation.GetAreaPoints.Length > 3)
                 {
                     if (spawnLocation.TryRemoveAreaPoint(this.selectedIDs[0]))
                     {
@@ -80,23 +83,24 @@ namespace Editor.World.Spawner
             if (spawnLocation.IsAreaSpawnType)
                 this.AreaTools(Event.current, spawnLocation);
             else
-                this.LocationTools(spawnLocation);
+                LocationTools(spawnLocation);
         }
 
         #endregion
 
         #region Internal
 
-        private void LocationTools(SpawnLocation spawnLocation)
+        private static void LocationTools(SpawnLocation spawnLocation)
         {
             foreach (Transform t in spawnLocation.GetLocationPoints)
             {
-                var fmh_94_65_638231264529049304 = Quaternion.identity; t.position = Handles.FreeMoveHandle(t.position, handleSize, Vector3.zero, Handles.SphereHandleCap);
+                t.position = Handles.FreeMoveHandle(t.position, HandleSize, Vector3.zero, Handles.SphereHandleCap);
 
-                var fmh_96_87_638231264529085418 = Quaternion.identity; Vector3 target = Handles.FreeMoveHandle(t.position + t.forward * .5f, handleSize, Vector3.zero, Handles.SphereHandleCap);
-                target = new(target.x, t.position.y, target.z);
+                Vector3 targetPosition = Handles.FreeMoveHandle(t.position + t.forward * .5f, HandleSize, Vector3.zero,
+                    Handles.SphereHandleCap);
+                targetPosition = new Vector3(targetPosition.x, t.position.y, targetPosition.z);
 
-                t.LookAt(target);
+                t.LookAt(targetPosition);
             }
         }
 
@@ -108,7 +112,8 @@ namespace Editor.World.Spawner
             {
                 for (int i = 0; i < positions.Length; i++)
                 {
-                    var fmh_111_80_638231264529094318 = Quaternion.identity; Vector3 newPosition = Handles.FreeMoveHandle(positions[i], handleSize, Vector3.zero, Handles.SphereHandleCap);
+                    Vector3 newPosition =
+                        Handles.FreeMoveHandle(positions[i], HandleSize, Vector3.zero, Handles.SphereHandleCap);
 
                     if (newPosition == positions[i]) continue;
 
@@ -122,7 +127,8 @@ namespace Editor.World.Spawner
                 {
                     Handles.color = this.selectedIDs.Contains(i) ? Color.green : Color.red;
 
-                    bool clicked = Handles.Button(positions[i], Quaternion.identity, handleSize, handleSize, Handles.SphereHandleCap);
+                    bool clicked = Handles.Button(positions[i], Quaternion.identity, HandleSize, HandleSize,
+                        Handles.SphereHandleCap);
 
                     if (!clicked) continue;
 
@@ -156,14 +162,15 @@ namespace Editor.World.Spawner
             }
         }
 
-        private void LowerAreaPointsToGround(SpawnLocation spawnLocation)
+        private static void LowerAreaPointsToGround(SpawnLocation spawnLocation)
         {
             LayerMask layerMask = LayerMask.GetMask("Environment");
             Vector3[] points = spawnLocation.GetAreaPoints;
             for (int i = 0; i < points.Length; i++)
             {
-                if (Physics.Raycast(points[i], -Vector3.up, out RaycastHit hit, Mathf.Infinity, layerMask, QueryTriggerInteraction.Ignore))
-                    spawnLocation.SetAreaPointPosition(i, hit.point + Vector3.up * aboveFloorDistance);
+                if (Physics.Raycast(points[i], -Vector3.up, out RaycastHit hit, Mathf.Infinity, layerMask,
+                        QueryTriggerInteraction.Ignore))
+                    spawnLocation.SetAreaPointPosition(i, hit.point + Vector3.up * AboveFloorDistance);
             }
 
             Undo.RecordObject(spawnLocation, "Lowered Area Points to ground level");
@@ -180,4 +187,5 @@ namespace Editor.World.Spawner
 
         #endregion
     }
+#endif
 }

@@ -12,7 +12,7 @@ namespace Runtime.AI.Navigation
     {
         #region Values
 
-        private readonly List<UnitAgent> agents;
+        private readonly List<NavigationAgent> agents;
 
         private Vector2 center, direction;
 
@@ -22,9 +22,9 @@ namespace Runtime.AI.Navigation
 
         #region Build In States
 
-        public UnitWalkGroup(UnitAgent agent1, UnitAgent agent2, int id)
+        public UnitWalkGroup(NavigationAgent agent1, NavigationAgent agent2, int id)
         {
-            this.agents = new List<UnitAgent>();
+            this.agents = new List<NavigationAgent>();
             this.center = (agent1.transform.position.XZ() + agent2.transform.position.XZ()) * .5f;
             this.direction = (agent1.GetCurrentNavMeshDirection() + agent2.GetCurrentNavMeshDirection()) * .5f;
             this.id = id;
@@ -46,7 +46,7 @@ namespace Runtime.AI.Navigation
             return this.direction;
         }
 
-        public List<UnitAgent> GetAgents()
+        public List<NavigationAgent> GetAgents()
         {
             return this.agents;
         }
@@ -63,7 +63,7 @@ namespace Runtime.AI.Navigation
         public void SetID(int set)
         {
             this.id = set;
-            foreach (UnitAgent unitAgent in this.agents)
+            foreach (NavigationAgent unitAgent in this.agents)
                 unitAgent.SetGroupID(this.id);
         }
 
@@ -82,7 +82,7 @@ namespace Runtime.AI.Navigation
                 return;
             }
 
-            foreach (UnitAgent agent in this.agents)
+            foreach (NavigationAgent agent in this.agents)
             {
                 this.center += agent.transform.position.XZ();
                 this.direction += agent.GetCurrentNavMeshDirection();
@@ -92,14 +92,14 @@ namespace Runtime.AI.Navigation
             this.direction /= this.agents.Count;
         }
 
-        public void AddAgent(UnitAgent agent)
+        public void AddAgent(NavigationAgent agent)
         {
             if (!this.agents.Contains(agent))
                 this.agents.Add(agent);
             agent.SetGroupID(this.id);
         }
 
-        public bool RemoveAgent(UnitAgent agent)
+        public bool RemoveAgent(NavigationAgent agent)
         {
             this.agents.Remove(agent);
             agent.SetGroupID(-1);

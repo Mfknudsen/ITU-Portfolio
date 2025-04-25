@@ -28,7 +28,7 @@ namespace Runtime.AI.Navigation
 
         public UnitPath(Vector3 startPoint, Vector3 endPoint, int[] pathTriangleIDs, NavTriangle[] triangles,
             Vector3[] verts,
-            Vector2[] simpleVerts, UnitAgent agent)
+            Vector2[] simpleVerts, NavigationAgent agent)
         {
             this.actionIndex = 0;
             this.endPoint = endPoint;
@@ -91,7 +91,7 @@ namespace Runtime.AI.Navigation
         #region In
 
 #if UNITY_EDITOR
-        public void DebugPath(UnitAgent agent)
+        public void DebugPath(NavigationAgent agent)
         {
             if (this.Empty || !UnitNavigation.Ready)
                 return;
@@ -102,7 +102,7 @@ namespace Runtime.AI.Navigation
         }
 #endif
 
-        public void CheckIndex(UnitAgent agent)
+        public void CheckIndex(NavigationAgent agent)
         {
             if (this.actions[this.actionIndex].CheckAction(this, agent))
                 this.actionIndex++;

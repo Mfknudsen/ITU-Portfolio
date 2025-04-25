@@ -1,5 +1,6 @@
 #region Libraries
 
+using Unity.Burst;
 using Unity.Mathematics;
 using UnityEngine;
 using Vector2 = UnityEngine.Vector2;
@@ -9,6 +10,7 @@ using Vector3 = UnityEngine.Vector3;
 
 namespace Runtime.Core
 {
+    [BurstCompile]
     public static class MathC
     {
         public static bool LineIntersect2DWithTolerance(Vector2 start1, Vector2 end1, Vector2 start2, Vector2 end2,

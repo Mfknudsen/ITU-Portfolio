@@ -18,10 +18,12 @@ namespace Editor.Tests
         {
             UnitNavigation.SetNavMesh(this.navMesh);
 
+            yield return new WaitWhile(() => !UnitNavigation.Ready);
+
             while (this.team1.Any(agent => !agent.HasEntity() && agent.gameObject.activeSelf) ||
                    this.team2.Any(agent => !agent.HasEntity() && agent.gameObject.activeSelf))
                 yield return null;
-            
+
             for (int i = 0; i < this.team1.Length; i++)
             {
                 if (this.team1[i].gameObject.activeSelf)
@@ -32,6 +34,7 @@ namespace Editor.Tests
             }
         }
 
+#if UNITY_EDITOR
         private void OnDrawGizmos()
         {
             return;
@@ -60,10 +63,11 @@ namespace Editor.Tests
                 Handles.Label(t.Center(this.navMesh), t.ID.ToString());
             }
         }
+#endif
 
         #region Values
 
-        [SerializeField] private UnitAgent[] team1, team2;
+        [SerializeField] private NavigationAgent[] team1, team2;
 
         [SerializeField] [Required] private NavigationMesh navMesh;
 

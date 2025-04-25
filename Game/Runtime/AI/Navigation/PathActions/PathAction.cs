@@ -8,7 +8,7 @@ namespace Runtime.AI.Navigation.PathActions
 {
     public abstract class PathAction
     {
-        public abstract bool CheckAction(UnitPath path, UnitAgent agent);
+        public abstract bool CheckAction(UnitPath path, NavigationAgent agent);
 
         public abstract Vector3 Destination();
 

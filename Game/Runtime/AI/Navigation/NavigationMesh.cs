@@ -275,9 +275,9 @@ namespace Runtime.AI.Navigation
             this.navPointIDs = new List<int>();
             this.widthDistanceBetweenNeighbor = new List<float>();
 
-            this.ab = verts[1].XZ() - verts[0].XZ();
-            this.bc = verts[2].XZ() - verts[1].XZ();
-            this.ac = verts[2].XZ() - verts[0].XZ();
+            this.ab = verts[1] - verts[0];
+            this.bc = verts[2] - verts[1];
+            this.ac = verts[2] - verts[0];
         }
 
         #endregion
@@ -310,9 +310,9 @@ namespace Runtime.AI.Navigation
 
         public readonly bool GetEdgeBC => this.bcEdge;
 
-        public readonly Vector2 GetAB => this.ab;
-        public readonly Vector2 GetBC => this.bc;
-        public readonly Vector2 GetAC => this.ac;
+        public readonly Vector3 GetAB => this.ab;
+        public readonly Vector3 GetBC => this.bc;
+        public readonly Vector3 GetAC => this.ac;
 
         #endregion
 

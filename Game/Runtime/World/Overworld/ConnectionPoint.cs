@@ -17,10 +17,14 @@ namespace Runtime.World.Overworld
 
         #region Build In States
 
-        private void OnValidate() =>
-            this.name = !this.connectTo.IsEmpty ?
-            "ConnectionPoint - " + this.connectTo.ScenePath.Split('/')[^1].Replace(".unity", "") :
-            "EMPTY CONNECTION POINT";
+#if UNITY_EDITOR
+        private void OnValidate()
+        {
+            this.name = !this.connectTo.IsEmpty
+                ? "ConnectionPoint - " + this.connectTo.ScenePath.Split('/')[^1].Replace(".unity", "")
+                : "EMPTY CONNECTION POINT";
+        }
+#endif
 
         #endregion
 

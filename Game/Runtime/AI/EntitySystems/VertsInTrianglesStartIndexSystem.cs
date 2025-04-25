@@ -20,15 +20,16 @@ namespace Runtime.AI.EntitySystems
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            Entity navmeshEntity = SystemAPI.GetSingletonEntity<NavigationMeshSingletonComponent>();
+            if (!SystemAPI.TryGetSingletonEntity<NavigationMeshSingletonComponent>(out Entity navmeshEntity))
+                return;
 
             DynamicBuffer<VertInTrianglesFlattenBufferElement> vertInTrianglesFlattenBufferElements =
                 SystemAPI.GetBuffer<VertInTrianglesFlattenBufferElement>(navmeshEntity);
 
+
             for (int i = 1; i < vertInTrianglesFlattenBufferElements.Length; i++)
             {
-                VertInTrianglesFlattenBufferElement element =
-                    vertInTrianglesFlattenBufferElements[i];
+                VertInTrianglesFlattenBufferElement element = vertInTrianglesFlattenBufferElements[i];
                 element.StartIndex = vertInTrianglesFlattenBufferElements[i - 1].StartIndex +
                                      vertInTrianglesFlattenBufferElements[i - 1].Size;
                 vertInTrianglesFlattenBufferElements[i] = element;
@@ -38,7 +39,8 @@ namespace Runtime.AI.EntitySystems
 
             VertsInTrianglesStartIndexJob vertsInTrianglesStartIndexJob =
                 new VertsInTrianglesStartIndexJob(vertInTrianglesFlattenBufferElements);
-            state.Dependency = vertsInTrianglesStartIndexJob.Schedule(vertInTrianglesFlattenBufferElements.Length, 64,
+            state.Dependency = vertsInTrianglesStartIndexJob.Schedule(vertInTrianglesFlattenBufferElements.Length,
+                64,
                 state.Dependency);
         }
     }

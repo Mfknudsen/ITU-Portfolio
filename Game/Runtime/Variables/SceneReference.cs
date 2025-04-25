@@ -17,6 +17,7 @@ namespace Runtime.Variables
 #if UNITY_EDITOR
         // What we use in editor to select the scene
         [SerializeField] private Object sceneAsset;
+
         private bool IsValidSceneAsset
         {
             get
@@ -26,14 +27,13 @@ namespace Runtime.Variables
                 return this.sceneAsset is SceneAsset;
             }
         }
-#endif
 
         public bool IsEmpty => this.sceneAsset == null;
+#endif
 
 
         // This should only ever be set during serialization/deserialization!
-        [SerializeField]
-        private string scenePath = string.Empty;
+        [SerializeField] private string scenePath = string.Empty;
 
         // Use this when you want to actually have the scene path
         public string ScenePath
@@ -58,8 +58,10 @@ namespace Runtime.Variables
             }
         }
 
-        public static implicit operator string(SceneReference sceneReference) =>
-            sceneReference.ScenePath;
+        public static implicit operator string(SceneReference sceneReference)
+        {
+            return sceneReference.ScenePath;
+        }
 
         // Called to prepare this data for serialization. Stubbed out when not in editor.
         public void OnBeforeSerialize()
@@ -81,7 +83,9 @@ namespace Runtime.Variables
 #if UNITY_EDITOR
         private SceneAsset GetSceneAssetFromPath()
         {
-            return string.IsNullOrEmpty(this.scenePath) ? null : AssetDatabase.LoadAssetAtPath<SceneAsset>(this.scenePath);
+            return string.IsNullOrEmpty(this.scenePath)
+                ? null
+                : AssetDatabase.LoadAssetAtPath<SceneAsset>(this.scenePath);
         }
 
         private string GetScenePathFromAsset()

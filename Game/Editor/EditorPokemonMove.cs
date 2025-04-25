@@ -5,14 +5,17 @@ using Runtime.Battle.Actions;
 using Runtime.Pokémon;
 using Runtime.Pokémon.Conditions;
 using Runtime.Pokémon.Conditions.Non_Volatiles;
+#if UNITY_EDITOR
 using Sirenix.OdinInspector.Editor;
 using UnityEditor;
+#endif
 using UnityEngine;
 
 #endregion
 
 namespace Editor
 {
+#if UNITY_EDITOR
     [CustomEditor(typeof(PokemonMove))]
     public sealed class EditorPokemonMove : OdinEditor
     {
@@ -421,4 +424,5 @@ namespace Editor
             EditorGUILayout.EndVertical();
         }
     }
+#endif
 }

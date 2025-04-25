@@ -14,7 +14,7 @@ namespace Runtime.AI.Navigation.PathActions
             throw new NotImplementedException();
         }
 
-        public override bool CheckAction(UnitPath path, UnitAgent agent)
+        public override bool CheckAction(UnitPath path, NavigationAgent agent)
         {
             throw new NotImplementedException();
         }

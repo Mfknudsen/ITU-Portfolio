@@ -8,6 +8,7 @@ using UnityEngine;
 
 namespace Editor
 {
+#if UNITY_EDITOR
     [CustomEditor(typeof(RoadCreator))]
     public class RoadEditor : UnityEditor.Editor
     {
@@ -23,4 +24,5 @@ namespace Editor
             this.creator = (RoadCreator)this.target;
         }
     }
+#endif
 }

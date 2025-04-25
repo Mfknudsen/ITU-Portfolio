@@ -13,13 +13,16 @@ namespace Runtime.ScriptableVariables.Objects.Items
     {
         #region Values
 
-        [SerializeField, BoxGroup("Rules")] private bool mostBeHoldable, mostBeThrowable;
+        [SerializeField] [BoxGroup("Rules")] private bool mostBeHoldable, mostBeThrowable;
 
         #endregion
 
         #region Getters
 
-        public GameObject GetVisual() => this.Value.GetVisualPrefab();
+        public GameObject GetVisual()
+        {
+            return this.Value.GetVisualPrefab();
+        }
 
         #endregion
 
@@ -29,16 +32,20 @@ namespace Runtime.ScriptableVariables.Objects.Items
         {
             if (this.mostBeHoldable && item is not IHoldableItem)
             {
+#if UNITY_EDITOR
                 if (this.debugSetter)
                     Debug.Log("Item " + item.name + " is not holdable", this);
+#endif
 
                 return false;
             }
 
             if (!this.mostBeThrowable || item is IThrowableItem) return true;
 
+#if UNITY_EDITOR
             if (this.debugSetter)
                 Debug.Log("Item " + item.name + " is not throwable", this);
+#endif
 
             return false;
         }

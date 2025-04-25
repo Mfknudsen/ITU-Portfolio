@@ -29,12 +29,14 @@ namespace Runtime.Pokémon.Pokédex
 
         #region Out
 
+#if UNITY_EDITOR
         public static Pokemon Get(string path)
         {
             Pokemon result = AssetDatabase.LoadAssetAtPath<Pokemon>(ScriptableObjectAssetFolder + path);
 
             return result;
         }
+#endif
 
         #endregion
     }

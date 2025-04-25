@@ -17,12 +17,12 @@ namespace Runtime.ScriptableVariables
         [SerializeField] protected bool debugSetter;
 
         // ReSharper disable once NotAccessedField.Local
-        [SerializeField, TextArea] private string description;
+        [SerializeField] [TextArea] private string description;
 #endif
 
         [SerializeField] protected TGeneric defaultValue;
 
-        [NonSerialized, ShowInInspector, ReadOnly]
+        [NonSerialized] [ShowInInspector] [ReadOnly]
         protected TGeneric localValue;
 
         public TGeneric Value
@@ -36,8 +36,10 @@ namespace Runtime.ScriptableVariables
 
                 this.InvokeEvents(value);
 
+#if UNITY_EDITOR
                 if (this.debugSetter)
                     Debug.Log(value, this);
+#endif
             }
         }
 
@@ -49,7 +51,10 @@ namespace Runtime.ScriptableVariables
 
         #region Build In States
 
-        protected virtual void OnEnable() => this.localValue = this.defaultValue;
+        protected virtual void OnEnable()
+        {
+            this.localValue = this.defaultValue;
+        }
 
         #endregion
 
@@ -62,8 +67,10 @@ namespace Runtime.ScriptableVariables
             this.valueChangeEventWithHistory.AddListener(action);
         }
 
-        public void RemoveListener(UnityAction<TGeneric, TGeneric> action) =>
+        public void RemoveListener(UnityAction<TGeneric, TGeneric> action)
+        {
             this.valueChangeEventWithHistory?.RemoveListener(action);
+        }
 
         public void AddListener(UnityAction<TGeneric> action)
         {
@@ -72,8 +79,10 @@ namespace Runtime.ScriptableVariables
             this.valueChangeEventWithValue.AddListener(action);
         }
 
-        public void RemoveListener(UnityAction<TGeneric> action) =>
+        public void RemoveListener(UnityAction<TGeneric> action)
+        {
             this.valueChangeEventWithValue?.RemoveListener(action);
+        }
 
         public void AddListener(UnityAction action)
         {
@@ -82,8 +91,10 @@ namespace Runtime.ScriptableVariables
             this.valueChangeEvent.AddListener(action);
         }
 
-        public void RemoveListener(UnityAction action) =>
+        public void RemoveListener(UnityAction action)
+        {
             this.valueChangeEvent?.RemoveListener(action);
+        }
 
         #endregion
 
@@ -96,7 +107,10 @@ namespace Runtime.ScriptableVariables
             this.valueChangeEventWithValue?.Invoke(toCheck);
         }
 
-        protected virtual bool ValueAcceptable(TGeneric item) => true;
+        protected virtual bool ValueAcceptable(TGeneric item)
+        {
+            return true;
+        }
 
         #endregion
     }

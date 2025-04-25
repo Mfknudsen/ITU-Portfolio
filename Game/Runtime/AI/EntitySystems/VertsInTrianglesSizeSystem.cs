@@ -10,6 +10,11 @@ namespace Runtime.AI.EntitySystems
     [UpdateInGroup(typeof(NavigationSystemGroup))]
     internal partial struct VertsInTrianglesSizeSystem : ISystem
     {
+        private DynamicBuffer<TriangleFlattenBufferElement> sizeBufferElements;
+        private DynamicBuffer<VertInTrianglesFlattenBufferElement> vertInTrianglesFlattenBufferElements;
+        private DynamicBuffer<VertBufferElement> simpleVerts;
+        private DynamicBuffer<NavTriangleBufferElement> triangles;
+
         [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
@@ -19,48 +24,47 @@ namespace Runtime.AI.EntitySystems
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            Entity navmeshEntity = SystemAPI.GetSingletonEntity<NavigationMeshSingletonComponent>();
-
-            DynamicBuffer<TriangleFlattenBufferElement> sizeBufferElements =
-                SystemAPI.GetBuffer<TriangleFlattenBufferElement>(navmeshEntity);
-
-            if (sizeBufferElements.Length == 0)
+            if (!SystemAPI.TryGetSingletonEntity<NavigationMeshSingletonComponent>(out Entity navmeshEntity))
                 return;
 
-            DynamicBuffer<VertInTrianglesFlattenBufferElement> vertInTrianglesFlattenBufferElements =
+            this.sizeBufferElements =
+                SystemAPI.GetBuffer<TriangleFlattenBufferElement>(navmeshEntity);
+            this.vertInTrianglesFlattenBufferElements =
                 SystemAPI.GetBuffer<VertInTrianglesFlattenBufferElement>(navmeshEntity);
-
-            DynamicBuffer<VertBufferElement> simpleVerts =
+            this.simpleVerts =
                 SystemAPI.GetBuffer<VertBufferElement>(navmeshEntity);
-
-            if (vertInTrianglesFlattenBufferElements.Length < simpleVerts.Length)
-            {
-                vertInTrianglesFlattenBufferElements.AddRange(
-                    new NativeArray<VertInTrianglesFlattenBufferElement>(
-                        simpleVerts.Length - vertInTrianglesFlattenBufferElements.Length, Allocator.Temp));
-            }
-            else if (vertInTrianglesFlattenBufferElements.Length > simpleVerts.Length)
-            {
-                vertInTrianglesFlattenBufferElements.RemoveRange(simpleVerts.Length,
-                    vertInTrianglesFlattenBufferElements.Length - simpleVerts.Length);
-            }
-
-            DynamicBuffer<NavTriangleBufferElement> triangles =
+            this.triangles =
                 SystemAPI.GetBuffer<NavTriangleBufferElement>(navmeshEntity);
 
-            for (int i = 0; i < vertInTrianglesFlattenBufferElements.Length; i++)
+            if (this.sizeBufferElements.Length == 0)
+                return;
+
+            if (this.vertInTrianglesFlattenBufferElements.Length < this.simpleVerts.Length)
+            {
+                this.vertInTrianglesFlattenBufferElements.AddRange(
+                    new NativeArray<VertInTrianglesFlattenBufferElement>(
+                        this.simpleVerts.Length - this.vertInTrianglesFlattenBufferElements.Length, Allocator.Temp));
+            }
+            else if (this.vertInTrianglesFlattenBufferElements.Length > this.simpleVerts.Length)
+            {
+                this.vertInTrianglesFlattenBufferElements.RemoveRange(this.simpleVerts.Length,
+                    this.vertInTrianglesFlattenBufferElements.Length - this.simpleVerts.Length);
+            }
+
+            for (int i = 0; i < this.vertInTrianglesFlattenBufferElements.Length; i++)
             {
                 VertInTrianglesFlattenBufferElement vertInTrianglesFlattenBufferElement =
-                    vertInTrianglesFlattenBufferElements[i];
+                    this.vertInTrianglesFlattenBufferElements[i];
                 vertInTrianglesFlattenBufferElement.Size = 0;
-                vertInTrianglesFlattenBufferElements[i] = vertInTrianglesFlattenBufferElement;
+                this.vertInTrianglesFlattenBufferElements[i] = vertInTrianglesFlattenBufferElement;
             }
 
             VertsInTrianglesSizeJob vertsInTrianglesSizeJob = new VertsInTrianglesSizeJob(
-                triangles,
-                vertInTrianglesFlattenBufferElements);
+                this.triangles,
+                this.vertInTrianglesFlattenBufferElements);
             state.Dependency =
-                vertsInTrianglesSizeJob.Schedule(triangles.Length, 64, state.Dependency);
+                vertsInTrianglesSizeJob.Schedule(this.triangles.Length, 64, state.Dependency);
+            state.CompleteDependency();
         }
     }
 

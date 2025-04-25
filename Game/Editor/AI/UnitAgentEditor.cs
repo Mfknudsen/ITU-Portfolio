@@ -5,7 +5,9 @@ using Editor.Common;
 using Runtime.AI.Navigation;
 using Runtime.AI.Navigation.RayCast;
 using Runtime.Core;
+#if UNITY_EDITOR
 using Sirenix.OdinInspector.Editor;
+#endif
 using UnityEditor;
 using UnityEngine;
 
@@ -13,12 +15,14 @@ using UnityEngine;
 
 namespace Editor.AI
 {
-    [CustomEditor(typeof(UnitAgent))]
+#if UNITY_EDITOR
+
+    [CustomEditor(typeof(NavigationAgent))]
     public sealed class UnitAgentEditor : OdinEditor
     {
         #region Values
 
-        private UnitAgent agent;
+        private NavigationAgent agent;
 
         #endregion
 
@@ -28,7 +32,7 @@ namespace Editor.AI
         {
             base.OnEnable();
 
-            this.agent = (UnitAgent)this.target;
+            this.agent = (NavigationAgent)this.target;
         }
 
         private void OnSceneGUI()
@@ -106,7 +110,8 @@ namespace Editor.AI
 
             Debug.DrawRay(this.agent.transform.position + Vector3.up * .5f, directionXZ.ToV3(0), Color.green);
         }
-    }
 
-    #endregion
+        #endregion
+    }
+#endif
 }

@@ -1,7 +1,9 @@
 #region Packages
 
 using Runtime.Communication;
+#if UNITY_EDITOR
 using Sirenix.OdinInspector.Editor;
+#endif
 using UnityEditor;
 using UnityEngine;
 
@@ -9,6 +11,7 @@ using UnityEngine;
 
 namespace Editor
 {
+#if UNITY_EDITOR
     [CustomEditor(typeof(Chat), true)]
     public sealed class EditorChat : OdinEditor
     {
@@ -59,4 +62,5 @@ namespace Editor
             }
         }
     }
+#endif
 }

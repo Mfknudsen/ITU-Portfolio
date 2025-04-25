@@ -6,6 +6,7 @@ using UnityEditor;
 
 namespace Editor.Tools
 {
+#if UNITY_EDITOR
     public sealed class PokemonEditorWindow : EditorWindow
     {
         [MenuItem("Window/Mfknudsen/Pokemon")]
@@ -15,4 +16,5 @@ namespace Editor.Tools
             window.Show();
         }
     }
+#endif
 }

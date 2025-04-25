@@ -8,21 +8,11 @@ using UnityEngine;
 
 namespace Runtime.Systems.Pooling
 {
-    [InitializeOnLoad]
     public static class Pool
     {
         #region Values
 
         private static readonly Dictionary<int, PoolHolder> Pools = new Dictionary<int, PoolHolder>();
-
-        #endregion
-
-        #region Build In States
-
-        static Pool()
-        {
-            EditorApplication.playModeStateChanged += InPlayModeExit;
-        }
 
         #endregion
 
@@ -78,6 +68,14 @@ namespace Runtime.Systems.Pooling
         #endregion
 
         #region Internal
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSplashScreen)]
+        private static void Initialize()
+        {
+#if UNITY_EDITOR
+            EditorApplication.playModeStateChanged += InPlayModeExit;
+#endif
+        }
 
         private static GameObject CreatePoolItem(Object prefab, bool activateObject, Transform parent = null)
         {

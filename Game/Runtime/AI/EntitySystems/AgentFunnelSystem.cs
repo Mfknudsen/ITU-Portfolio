@@ -6,7 +6,6 @@ using Unity.Collections;
 using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
-using Unity.Transforms;
 using UnityEngine;
 
 namespace Runtime.AI.EntitySystems
@@ -16,80 +15,112 @@ namespace Runtime.AI.EntitySystems
     [BurstCompile]
     internal partial struct AgentFunnelSystem : ISystem
     {
-        [BurstCompile]
+        private EntityQuery entityQuery;
+
+        private ComponentLookup<UnitAgentComponent> agentLookup;
+        private ComponentLookup<DestinationComponent> destinationLookup;
+        private ComponentLookup<AgentSettingsComponent> settingsLookup;
+        private BufferLookup<WayPointBufferElement> funnelPathLookup;
+        private BufferLookup<AgentTrianglePathBufferElement> trianglePathLookup;
+
         public void OnCreate(ref SystemState state)
         {
             state.RequireForUpdate<NavigationMeshSingletonComponent>();
             state.RequireForUpdate<UnitAgentComponent>();
+
+            this.entityQuery = state.GetEntityQuery(ComponentType.ReadOnly<UnitAgentComponent>(),
+                ComponentType.ReadWrite<DestinationComponent>());
+
+            this.agentLookup = state.GetComponentLookup<UnitAgentComponent>(true);
+            this.destinationLookup = state.GetComponentLookup<DestinationComponent>();
+            this.settingsLookup = state.GetComponentLookup<AgentSettingsComponent>(true);
+            this.funnelPathLookup = state.GetBufferLookup<WayPointBufferElement>();
+            this.trianglePathLookup = state.GetBufferLookup<AgentTrianglePathBufferElement>(true);
         }
 
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            Entity navmeshEntity = SystemAPI.GetSingletonEntity<NavigationMeshSingletonComponent>();
+            if (!SystemAPI.TryGetSingletonEntity<NavigationMeshSingletonComponent>(out Entity navmeshEntity))
+                return;
 
-            DynamicBuffer<VertBufferElement> simpleVerts =
-                SystemAPI.GetBuffer<VertBufferElement>(navmeshEntity);
-            DynamicBuffer<NavTriangleBufferElement> triangles =
-                SystemAPI.GetBuffer<NavTriangleBufferElement>(navmeshEntity);
+            NativeArray<Entity> entities = this.entityQuery.ToEntityArray(Allocator.TempJob);
 
-            NativeList<Entity> entities = state.GetEntityQuery(ComponentType.ReadOnly<UnitAgentComponent>())
-                .ToEntityListAsync(Allocator.TempJob, state.Dependency, out JobHandle handle);
-            handle.Complete();
+            if (entities.Length == 0)
+            {
+                entities.Dispose();
+                return;
+            }
+
+            this.agentLookup.Update(ref state);
+            this.destinationLookup.Update(ref state);
+            this.settingsLookup.Update(ref state);
+            this.funnelPathLookup.Update(ref state);
+            this.trianglePathLookup.Update(ref state);
+
+            NativeArray<VertBufferElement> simpleVerts =
+                SystemAPI.GetBuffer<VertBufferElement>(navmeshEntity).ToNativeArray(Allocator.TempJob);
+            NativeArray<NavTriangleBufferElement> triangles =
+                SystemAPI.GetBuffer<NavTriangleBufferElement>(navmeshEntity).ToNativeArray(Allocator.TempJob);
+
+            int batch = math.max(entities.Length / SystemInfo.processorCount, 1);
+
             AgentFunnelJob agentFunnelJob = new AgentFunnelJob(
                 entities,
                 triangles,
                 simpleVerts,
-                state.GetComponentLookup<DestinationComponent>(),
-                state.GetComponentLookup<AgentSettingsComponent>(true),
-                state.GetComponentLookup<LocalTransform>(true),
-                state.GetBufferLookup<WayPointBufferElement>(),
-                state.GetBufferLookup<AgentTrianglePathBufferElement>(true)
+                this.agentLookup,
+                this.destinationLookup,
+                this.settingsLookup,
+                this.funnelPathLookup,
+                this.trianglePathLookup
             );
 
-            state.Dependency =
-                agentFunnelJob.Schedule(entities, entities.Length / SystemInfo.processorCount, state.Dependency);
-            state.CompleteDependency();
-            entities.Dispose();
+            JobHandle handle =
+                agentFunnelJob.ScheduleParallel(entities.Length, batch, state.Dependency);
+            JobHandle vertsHandle = simpleVerts.Dispose(handle);
+            JobHandle trianglesHandle = triangles.Dispose(vertsHandle);
+            JobHandle entitiesHandle = entities.Dispose(trianglesHandle);
+            state.Dependency = entitiesHandle;
         }
     }
 
     [BurstCompile]
-    internal struct AgentFunnelJob : IJobParallelForDefer
+    internal struct AgentFunnelJob : IJobFor
     {
-        [DeallocateOnJobCompletion] [ReadOnly] private readonly NativeArray<NavTriangleBufferElement> triangles;
-        [DeallocateOnJobCompletion] [ReadOnly] private readonly NativeArray<VertBufferElement> verts;
+        [ReadOnly] private readonly NativeArray<NavTriangleBufferElement> triangles;
+        [ReadOnly] private readonly NativeArray<VertBufferElement> verts;
 
         [NativeDisableParallelForRestriction] [ReadOnly]
-        private NativeList<Entity> entities;
+        private NativeArray<Entity> entities;
 
         [NativeDisableParallelForRestriction] [ReadOnly]
         private ComponentLookup<AgentSettingsComponent> settingsLookup;
 
         [NativeDisableParallelForRestriction] [ReadOnly]
-        private ComponentLookup<LocalTransform> transformLookup;
+        private ComponentLookup<UnitAgentComponent> agentLookup;
 
         [NativeDisableParallelForRestriction] private ComponentLookup<DestinationComponent> destinationLookup;
         [NativeDisableParallelForRestriction] private BufferLookup<WayPointBufferElement> funnelPathLookup;
         [NativeDisableParallelForRestriction] private BufferLookup<AgentTrianglePathBufferElement> trianglePathLookup;
 
         public AgentFunnelJob(
-            NativeList<Entity> entities,
-            DynamicBuffer<NavTriangleBufferElement> triangles,
-            DynamicBuffer<VertBufferElement> simpleVerts,
+            NativeArray<Entity> entities,
+            NativeArray<NavTriangleBufferElement> triangles,
+            NativeArray<VertBufferElement> simpleVerts,
+            ComponentLookup<UnitAgentComponent> agentLookup,
             ComponentLookup<DestinationComponent> destinationLookup,
             ComponentLookup<AgentSettingsComponent> settingsLookup,
-            ComponentLookup<LocalTransform> transformLookup,
             BufferLookup<WayPointBufferElement> funnelPathLookup,
             BufferLookup<AgentTrianglePathBufferElement> trianglePathLookup) : this()
         {
             this.entities = entities;
-            this.triangles = triangles.ToNativeArray(Allocator.TempJob);
-            this.verts = simpleVerts.ToNativeArray(Allocator.TempJob);
+            this.triangles = triangles;
+            this.verts = simpleVerts;
 
             this.destinationLookup = destinationLookup;
             this.settingsLookup = settingsLookup;
-            this.transformLookup = transformLookup;
+            this.agentLookup = agentLookup;
             this.funnelPathLookup = funnelPathLookup;
             this.trianglePathLookup = trianglePathLookup;
         }
@@ -100,7 +131,11 @@ namespace Runtime.AI.EntitySystems
             Entity entity = this.entities[index];
             DestinationComponent destination = this.destinationLookup[entity];
             AgentSettingsComponent agentSettings = this.settingsLookup[entity];
-            LocalTransform transform = this.transformLookup[entity];
+
+            if (!destination.Refresh)
+                return;
+
+            UnitAgentComponent agent = this.agentLookup[entity];
             DynamicBuffer<WayPointBufferElement> agentFunnelPath = this.funnelPathLookup[entity];
             DynamicBuffer<AgentTrianglePathBufferElement> agentTrianglePath = this.trianglePathLookup[entity];
 
@@ -109,7 +144,7 @@ namespace Runtime.AI.EntitySystems
             if (destination.TrianglePathCount > 1)
             {
                 //Apex is the newest point the agent will travel to.
-                float3 apex = transform.Position;
+                float3 apex = agent.Position;
                 //List of portals to check.
                 this.GetPortals(apex,
                     agentTrianglePath, destination.TrianglePathCount,
@@ -119,6 +154,7 @@ namespace Runtime.AI.EntitySystems
                     out NativeArray<int> leftArray);
                 int portalCount = rightArray.Length;
 
+#if UNITY_EDITOR && !UNITY_DOTSPLAYER
                 if (destination.Debug)
                 {
                     for (int i = 1; i < destination.TrianglePathCount; i++)
@@ -135,6 +171,7 @@ namespace Runtime.AI.EntitySystems
                             remappedVerts[leftArray[i - 1]] + new float3(0, 3, 0), Color.blue);
                     }
                 }
+#endif
 
                 //Portal vert ids is the current funnel.
                 float3 portalLeft = remappedVerts[leftArray[0]],
@@ -157,7 +194,7 @@ namespace Runtime.AI.EntitySystems
                     if (TriArea2(apex, portalRight, right) <= 0f)
                     {
                         //Update right if the new right point is within the funnel or the apex is the current right point
-                        if (apex.Equals(portalRight) ||
+                        if (math.all(apex == portalRight) ||
                             TriArea2(apex, portalLeft, right) > 0f)
                         {
                             //Tighten the funnel
@@ -185,7 +222,7 @@ namespace Runtime.AI.EntitySystems
                     if (!(TriArea2(apex, portalLeft, left) >= 0f)) continue;
 
                     //Update left if the new left point is within the funnel or the apex is the current left point
-                    if (apex.Equals(portalLeft) ||
+                    if (math.all(apex == portalLeft) ||
                         TriArea2(apex, portalRight, left) < 0f)
                     {
                         //Tighten the funnel
@@ -253,10 +290,13 @@ namespace Runtime.AI.EntitySystems
             AddToPath(ref agentFunnelPath, ref pathIndex, destination.Point, true);
             destination.FunnelPathCount = pathIndex;
 
+            this.destinationLookup[entity] = destination;
+
+#if UNITY_EDITOR && !UNITY_DOTSPLAYER
             if (!destination.Debug)
                 return;
 
-            Debug.DrawLine(transform.Position + new float3(0, 1, 0),
+            Debug.DrawLine(agent.Position + new float3(0, 1, 0),
                 agentFunnelPath[0].Point + new float3(0, 1, 0), Color.green);
 
             for (int i = 1; i < pathIndex; i++)
@@ -264,6 +304,10 @@ namespace Runtime.AI.EntitySystems
                 Debug.DrawLine(agentFunnelPath[i].Point + new float3(0, 1, 0),
                     agentFunnelPath[i - 1].Point + new float3(0, 1, 0), Color.green);
             }
+
+            destination.Refresh = false;
+            this.destinationLookup[entity] = destination;
+#endif
         }
 
         [BurstCompile]
@@ -326,26 +370,27 @@ namespace Runtime.AI.EntitySystems
                 float3 ab = this.verts[vertAIndex].Position -
                             this.verts[vertBIndex].Position;
 
-                if (remapped.ContainsKey(vertAIndex))
-                    remapped[vertAIndex] -= ab;
+                if (remapped.TryGetValue(vertAIndex, out float3 currentValue))
+                    remapped[vertAIndex] = currentValue - ab;
                 else
                     remapped.Add(vertAIndex, -ab);
 
-                if (remapped.ContainsKey(vertBIndex))
-                    remapped[vertBIndex] += ab;
+                if (remapped.TryGetValue(vertBIndex, out currentValue))
+                    remapped[vertBIndex] = currentValue + ab;
                 else
                     remapped.Add(vertBIndex, ab);
             }
 
-            foreach (KVPair<int, float3> kvPair in remapped)
+            NativeArray<int> keys = remapped.GetKeyArray(Allocator.Temp);
+            foreach (int key in keys)
             {
-                if (kvPair.Value.QuickSquareDistance() == 0)
-                {
-                    kvPair.Value = this.verts[kvPair.Key].Position;
-                    continue;
-                }
+                float3 value = remapped[key];
+                if (value.QuickSquareDistance() == 0)
+                    value = this.verts[key].Position;
+                else
+                    value = this.verts[key].Position + value.Normalize() * agentRadius;
 
-                kvPair.Value = this.verts[kvPair.Key].Position + kvPair.Value.Normalize() * agentRadius;
+                remapped[key] = value;
             }
 
             // for (int i = 0; i < oldVertIndex.Length; i++)
@@ -419,7 +464,7 @@ namespace Runtime.AI.EntitySystems
         }
 
         /// <summary>
-        ///     Calculates if clockwise or counter clockwise
+        ///     Calculates if clockwise or counterclockwise
         /// </summary>
         /// <param name="a">Apex</param>
         /// <param name="b">Portal point</param>
@@ -436,73 +481,27 @@ namespace Runtime.AI.EntitySystems
         }
 
         [BurstCompile]
-        private static int Contains(in NativeList<int> array, in int index)
-        {
-            for (int i = array.Length - 1; i >= 0; i--)
-            {
-                if (array[i] == index)
-                    return i;
-            }
-
-            return -1;
-        }
-
-        [BurstCompile]
         private static void Shared(in NavTriangleBufferElement a, in NavTriangleBufferElement b,
             ref NativeArray<int> result)
         {
-            int i = 0;
-            if (a.A == b.A)
-            {
-                result[i] = a.A;
-                i++;
-            }
+            int3 aVerts = new int3(a.A, a.B, a.C);
+            int3 bVerts = new int3(b.A, b.B, b.C);
 
-            if (a.A == b.B)
+            int found = 0;
+            for (int i = 0; i < 3 && found < 2; i++)
             {
-                result[i] = a.A;
-                i++;
-            }
+                for (int j = 0; j < 3 && found < 2; j++)
+                {
+                    if (aVerts[i] != bVerts[j]) continue;
 
-            if (a.A == b.C)
-            {
-                result[i] = a.A;
-                i++;
-            }
+                    result[found++] = aVerts[i];
 
-            if (a.B == b.A)
-            {
-                result[i] = a.B;
-                i++;
-            }
+                    if (found == 2)
+                        break;
+                }
 
-            if (a.B == b.B)
-            {
-                result[i] = a.B;
-                i++;
-            }
-
-            if (a.B == b.C)
-            {
-                result[i] = a.B;
-                i++;
-            }
-
-            if (a.C == b.A)
-            {
-                result[i] = a.C;
-                i++;
-            }
-
-            if (a.C == b.B)
-            {
-                result[i] = a.C;
-                i++;
-            }
-
-            if (a.C == b.C)
-            {
-                result[i] = a.C;
+                if (found == 2)
+                    break;
             }
         }
     }

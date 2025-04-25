@@ -9,6 +9,7 @@ using UnityEngine;
 
 namespace Editor.Tools
 {
+#if UNITY_EDITOR
     public static class CustomMenu
     {
         [MenuItem("Assets/Create/Shader/HLSL")]
@@ -58,4 +59,5 @@ namespace Editor.Tools
             "Interpolators Vertex(Attributes input)\n{\n    Interpolator output;\n    return output;\n}\n\n" +
             "float4 Fragment(Interpolators input) : SV_Target\n{\n    return 0;\n}";
     }
+#endif
 }
